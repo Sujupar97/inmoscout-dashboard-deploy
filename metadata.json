@@ -1,0 +1,6 @@
+{
+  "name": "InmoScout - Dashboard Inmobiliario Inteligente",
+  "description": "Un panel de control inteligente para que InmoScout descubra, analice y gestione oportunidades de inversión inmobiliaria utilizando IA. Esta aplicación proporciona un panel profesional para ver, filtrar y gestionar oportunidades de propiedades, mejorado con análisis impulsados por IA de la API de Gemini.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

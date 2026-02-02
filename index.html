@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="https://storage.googleapis.com/msgsndr/672ygNPnlPDz5UHb9LAN/media/68c8c91e440460923b8c842a.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>InmoScout | Dashboard Inmobiliario</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        /* Supabase-inspired Black & Green Theme */
+        --bg-primary: #111111;
+        --bg-secondary: #1C1C1C;
+        --bg-tertiary: #2D2D2D;
+        --border-primary: #363636;
+        --text-primary: #E5E7EB; /* gray-200 */
+        --text-secondary: #9CA3AF; /* gray-400 */
+        --text-tertiary: #6B7280; /* gray-500 */
+
+        /* Interactive */
+        --primary-accent: #10b981; /* green-500 */
+        --primary-accent-hover: #059669; /* green-600 */
+        --primary-accent-text: #34D399; /* green-400 */
+
+        /* Status Colors (Adjusted for Dark Mode) */
+        --status-new: #6366f1;
+        --status-contacted: #3b82f6;
+        --status-visit: #8b5cf6;
+        --status-negotiating: #f59e0b;
+        --status-acquired: #22c55e;
+        --status-discarded: #ef4444;
+        --status-opportunity: #14b8a6;
+
+        /* Scrollbar */
+        --scrollbar-track: #1C1C1C;
+        --scrollbar-thumb: #4b5563;
+        --scrollbar-thumb-hover: #6b7280;
+      }
+      body {
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        font-family: 'Inter', sans-serif;
+      }
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--scrollbar-thumb-hover);
+      }
+      @keyframes toast-in {
+        from {
+          transform: translateX(calc(100% + 1rem));
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      .animate-toast-in {
+        animation: toast-in 0.5s ease-out forwards;
+      }
+      @keyframes fade-in {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.3s ease-out forwards;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^18.2.0/",
+    "react": "https://esm.sh/react@^18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@^18.2.0/",
+    "react-dom/server": "https://esm.sh/react-dom@^18.2.0/server",
+    "@google/genai": "https://esm.sh/@google/genai@^1.10.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.0",
+    "leaflet": "https://esm.sh/leaflet@1.9.4",
+    "react-leaflet": "https://esm.sh/react-leaflet@4.2.1",
+    "@tanstack/react-virtual": "https://esm.sh/@tanstack/react-virtual@3.5.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

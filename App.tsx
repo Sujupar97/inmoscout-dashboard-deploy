@@ -105,7 +105,7 @@ const initialFilters: Filters = {
 };
 
 type DailyExecutionCounts = {
-    [portal: string]: number;
+  [portal: string]: number;
 };
 
 const PORTAL_SEQUENCE = ['Zonaprop', 'MercadoLibre', 'Argenprop'];
@@ -124,7 +124,7 @@ export const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const workerRef = useRef<Worker | null>(null);
   const propertiesLoadedRef = useRef(false);
-  
+
   const [isPending, startTransition] = useTransition();
 
   // --- Zonaprop Daily Updater State ---
@@ -140,7 +140,7 @@ export const App: React.FC = () => {
   const [mercadolibreUpdaterCountdown, setMercadolibreUpdaterCountdown] = useState<number | null>(null);
   const mercadolibreUpdaterLogicIntervalRef = useRef<number | null>(null);
   const mercadolibreUiCountdownIntervalRef = useRef<number | null>(null);
-  
+
   // --- Argenprop Daily Updater State ---
   const [argenpropUpdateJobs, setArgenpropUpdateJobs] = useState<UpdateJob[]>([]);
   const [isArgenpropUpdaterRunning, setIsArgenpropUpdaterRunning] = useState(false);
@@ -269,7 +269,7 @@ export const App: React.FC = () => {
         (payload) => {
           const portal = payload.new.portal;
           console.log(`WEBHOOK RECIBIDO: Iniciando actualizador para ${portal}`);
-          
+
           if (portal === 'Zonaprop') {
             handleResetUpdater();
             setTimeout(() => handleToggleUpdater(true), 1000);
@@ -296,14 +296,14 @@ export const App: React.FC = () => {
   // --- Auth & Profile Handling ---
   useEffect(() => {
     const getSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        setIsAppLoading(false);
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      setIsAppLoading(false);
     };
     getSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
+      setSession(session);
     });
 
     return () => subscription.unsubscribe();
@@ -311,17 +311,17 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const getProfile = async () => {
-        if (session?.user) {
-            try {
-                const profile = await fetchUserProfile(session.user.id);
-                setUserProfile(profile);
-            } catch (e: any) {
-                setError(`No se pudo cargar el perfil de usuario: ${e.message}`);
-                setUserProfile(null);
-            }
-        } else {
-            setUserProfile(null);
+      if (session?.user) {
+        try {
+          const profile = await fetchUserProfile(session.user.id);
+          setUserProfile(profile);
+        } catch (e: any) {
+          setError(`No se pudo cargar el perfil de usuario: ${e.message}`);
+          setUserProfile(null);
         }
+      } else {
+        setUserProfile(null);
+      }
     };
     getProfile();
   }, [session]);
@@ -339,66 +339,66 @@ export const App: React.FC = () => {
     setIsPropertiesLoading(true);
     setError(null);
     if (workerRef.current) {
-        workerRef.current.terminate();
+      workerRef.current.terminate();
     }
     try {
-        const rawProperties = await fetchProperties();
+      const rawProperties = await fetchProperties();
 
-        if (rawProperties.length === 0) {
-            setAllProperties([]);
-            setIsPropertiesLoading(false);
-            return;
-        }
-
-        const blob = new Blob([propertyProcessorWorkerString], { type: 'application/javascript' });
-        const worker = new Worker(URL.createObjectURL(blob));
-        workerRef.current = worker;
-
-        worker.onmessage = (event) => {
-            const { type, payload } = event.data;
-            if (type === 'SUCCESS') {
-                setAllProperties(payload);
-            } else {
-                setError(payload);
-                setAllProperties([]);
-            }
-            setIsPropertiesLoading(false);
-            worker.terminate();
-            workerRef.current = null;
-        };
-
-        worker.onerror = (error) => {
-            console.error('Error in property processor worker:', error);
-            setError(`A worker error occurred: ${error.message}`);
-            setAllProperties([]);
-            setIsPropertiesLoading(false);
-            worker.terminate();
-            workerRef.current = null;
-        };
-        
-        worker.postMessage(rawProperties);
-    } catch (e: any) {
-        if (e.message && (e.message.includes("Invalid Refresh Token") || e.message.includes("Refresh Token Not Found"))) {
-            await supabase.auth.signOut();
-            setSession(null);
-            return;
-        }
-        setError(e.message);
+      if (rawProperties.length === 0) {
+        setAllProperties([]);
         setIsPropertiesLoading(false);
+        return;
+      }
+
+      const blob = new Blob([propertyProcessorWorkerString], { type: 'application/javascript' });
+      const worker = new Worker(URL.createObjectURL(blob));
+      workerRef.current = worker;
+
+      worker.onmessage = (event) => {
+        const { type, payload } = event.data;
+        if (type === 'SUCCESS') {
+          setAllProperties(payload);
+        } else {
+          setError(payload);
+          setAllProperties([]);
+        }
+        setIsPropertiesLoading(false);
+        worker.terminate();
+        workerRef.current = null;
+      };
+
+      worker.onerror = (error) => {
+        console.error('Error in property processor worker:', error);
+        setError(`A worker error occurred: ${error.message}`);
+        setAllProperties([]);
+        setIsPropertiesLoading(false);
+        worker.terminate();
+        workerRef.current = null;
+      };
+
+      worker.postMessage(rawProperties);
+    } catch (e: any) {
+      if (e.message && (e.message.includes("Invalid Refresh Token") || e.message.includes("Refresh Token Not Found"))) {
+        await supabase.auth.signOut();
+        setSession(null);
+        return;
+      }
+      setError(e.message);
+      setIsPropertiesLoading(false);
     }
   }, []);
 
   useEffect(() => {
     if (userProfile && !propertiesLoadedRef.current) {
-        loadProperties();
-        propertiesLoadedRef.current = true;
+      loadProperties();
+      propertiesLoadedRef.current = true;
     }
   }, [userProfile, loadProperties]);
 
   useEffect(() => {
     setFilters(initialFilters);
   }, [activeView]);
-  
+
   // --- Zonaprop Daily Updater Logic ---
   const handleManualUpdateTrigger = useCallback((jobId: string) => {
     const job = updateJobs.find(j => j.id === jobId);
@@ -424,7 +424,7 @@ export const App: React.FC = () => {
       });
 
       setUpdateJobs(currentJobs => {
-        const newJobsState = currentJobs.map(j => 
+        const newJobsState = currentJobs.map(j =>
           j.id === jobId ? { ...j, status: UpdateJobStatus.Completed } : j
         );
         localStorage.setItem('dailyUpdateJobs', JSON.stringify(newJobsState));
@@ -450,27 +450,27 @@ export const App: React.FC = () => {
   }, [handleResetUpdater]);
 
   useEffect(() => {
-      if (uiCountdownIntervalRef.current) clearInterval(uiCountdownIntervalRef.current);
-      if (!isUpdaterRunning) {
-          setUpdaterCountdown(null);
-          return;
+    if (uiCountdownIntervalRef.current) clearInterval(uiCountdownIntervalRef.current);
+    if (!isUpdaterRunning) {
+      setUpdaterCountdown(null);
+      return;
+    }
+    const uiTick = () => {
+      const runningJobs = updateJobs.filter(j => j.status === UpdateJobStatus.Running);
+      if (runningJobs.length > 0 && runningJobs[0].lastRun) {
+        const earliestRun = Math.min(...runningJobs.map(j => j.lastRun!));
+        const secondsElapsed = Math.floor((Date.now() - earliestRun) / 1000);
+        const newCountdown = 90 - secondsElapsed;
+        setUpdaterCountdown(Math.max(0, newCountdown));
+      } else {
+        const isAnyPending = updateJobs.some(j => j.status === UpdateJobStatus.Pending);
+        if (isAnyPending) setUpdaterCountdown(90);
+        else setUpdaterCountdown(null);
       }
-      const uiTick = () => {
-          const runningJobs = updateJobs.filter(j => j.status === UpdateJobStatus.Running);
-          if (runningJobs.length > 0 && runningJobs[0].lastRun) {
-              const earliestRun = Math.min(...runningJobs.map(j => j.lastRun!));
-              const secondsElapsed = Math.floor((Date.now() - earliestRun) / 1000);
-              const newCountdown = 90 - secondsElapsed;
-              setUpdaterCountdown(Math.max(0, newCountdown));
-          } else {
-              const isAnyPending = updateJobs.some(j => j.status === UpdateJobStatus.Pending);
-              if (isAnyPending) setUpdaterCountdown(90);
-              else setUpdaterCountdown(null);
-          }
-      };
-      uiTick();
-      uiCountdownIntervalRef.current = window.setInterval(uiTick, 1000);
-      return () => { if (uiCountdownIntervalRef.current) clearInterval(uiCountdownIntervalRef.current); };
+    };
+    uiTick();
+    uiCountdownIntervalRef.current = window.setInterval(uiTick, 1000);
+    return () => { if (uiCountdownIntervalRef.current) clearInterval(uiCountdownIntervalRef.current); };
   }, [isUpdaterRunning, updateJobs]);
 
   useEffect(() => {
@@ -484,7 +484,7 @@ export const App: React.FC = () => {
         const runningJobs = newJobsState.filter(j => j.status === UpdateJobStatus.Running);
         runningJobs.forEach(runningJob => {
           if (runningJob.lastRun && (now - runningJob.lastRun) >= 90000) {
-            newJobsState = newJobsState.map(j => 
+            newJobsState = newJobsState.map(j =>
               j.id === runningJob.id ? { ...j, status: UpdateJobStatus.Completed } : j
             );
           }
@@ -576,34 +576,34 @@ export const App: React.FC = () => {
     } else {
       handleResetMercadolibreUpdater();
     }
-    
+
     // FIX: Siempre iniciar en false para evitar disparos automáticos.
     setIsMercadolibreUpdaterRunning(false);
     localStorage.setItem('isMercadolibreUpdaterRunning', 'false');
   }, [handleResetMercadolibreUpdater]);
 
   useEffect(() => {
-      if (mercadolibreUiCountdownIntervalRef.current) clearInterval(mercadolibreUiCountdownIntervalRef.current);
-      if (!isMercadolibreUpdaterRunning) {
-          setMercadolibreUpdaterCountdown(null);
-          return;
+    if (mercadolibreUiCountdownIntervalRef.current) clearInterval(mercadolibreUiCountdownIntervalRef.current);
+    if (!isMercadolibreUpdaterRunning) {
+      setMercadolibreUpdaterCountdown(null);
+      return;
+    }
+    const uiTick = () => {
+      const runningJobs = mercadolibreUpdateJobs.filter(j => j.status === UpdateJobStatus.Running);
+      if (runningJobs.length > 0 && runningJobs[0].lastRun) {
+        const earliestRun = Math.min(...runningJobs.map(j => j.lastRun!));
+        const secondsElapsed = Math.floor((Date.now() - earliestRun) / 1000);
+        const newCountdown = 90 - secondsElapsed;
+        setMercadolibreUpdaterCountdown(Math.max(0, newCountdown));
+      } else {
+        const isAnyPending = mercadolibreUpdateJobs.some(j => j.status === UpdateJobStatus.Pending);
+        if (isAnyPending) setMercadolibreUpdaterCountdown(90);
+        else setMercadolibreUpdaterCountdown(null);
       }
-      const uiTick = () => {
-          const runningJobs = mercadolibreUpdateJobs.filter(j => j.status === UpdateJobStatus.Running);
-          if (runningJobs.length > 0 && runningJobs[0].lastRun) {
-              const earliestRun = Math.min(...runningJobs.map(j => j.lastRun!));
-              const secondsElapsed = Math.floor((Date.now() - earliestRun) / 1000);
-              const newCountdown = 90 - secondsElapsed;
-              setMercadolibreUpdaterCountdown(Math.max(0, newCountdown));
-          } else {
-              const isAnyPending = mercadolibreUpdateJobs.some(j => j.status === UpdateJobStatus.Pending);
-              if (isAnyPending) setMercadolibreUpdaterCountdown(90);
-              else setMercadolibreUpdaterCountdown(null);
-          }
-      };
-      uiTick();
-      mercadolibreUiCountdownIntervalRef.current = window.setInterval(uiTick, 1000);
-      return () => { if (mercadolibreUiCountdownIntervalRef.current) clearInterval(mercadolibreUiCountdownIntervalRef.current); };
+    };
+    uiTick();
+    mercadolibreUiCountdownIntervalRef.current = window.setInterval(uiTick, 1000);
+    return () => { if (mercadolibreUiCountdownIntervalRef.current) clearInterval(mercadolibreUiCountdownIntervalRef.current); };
   }, [isMercadolibreUpdaterRunning, mercadolibreUpdateJobs]);
 
   useEffect(() => {
@@ -656,7 +656,7 @@ export const App: React.FC = () => {
   }, [isMercadolibreUpdaterRunning]);
 
   // --- Argenprop Daily Updater Logic ---
-    const handleManualArgenpropUpdateTrigger = useCallback((jobId: string) => {
+  const handleManualArgenpropUpdateTrigger = useCallback((jobId: string) => {
     const job = argenpropUpdateJobs.find(j => j.id === jobId);
     if (!job) return;
     if (window.confirm(`¿Estás seguro de que quieres disparar la ejecución para ${job.zona} - ${job.propertyType} y marcarla como completada?`)) {
@@ -684,34 +684,34 @@ export const App: React.FC = () => {
     } else {
       handleResetArgenpropUpdater();
     }
-    
+
     // FIX: Siempre iniciar en false para evitar disparos automáticos.
     setIsArgenpropUpdaterRunning(false);
     localStorage.setItem('isArgenpropUpdaterRunning', 'false');
   }, [handleResetArgenpropUpdater]);
 
   useEffect(() => {
-      if (argenpropUiCountdownIntervalRef.current) clearInterval(argenpropUiCountdownIntervalRef.current);
-      if (!isArgenpropUpdaterRunning) {
-          setArgenpropUpdaterCountdown(null);
-          return;
+    if (argenpropUiCountdownIntervalRef.current) clearInterval(argenpropUiCountdownIntervalRef.current);
+    if (!isArgenpropUpdaterRunning) {
+      setArgenpropUpdaterCountdown(null);
+      return;
+    }
+    const uiTick = () => {
+      const runningJobs = argenpropUpdateJobs.filter(j => j.status === UpdateJobStatus.Running);
+      if (runningJobs.length > 0 && runningJobs[0].lastRun) {
+        const earliestRun = Math.min(...runningJobs.map(j => j.lastRun!));
+        const secondsElapsed = Math.floor((Date.now() - earliestRun) / 1000);
+        const newCountdown = 90 - secondsElapsed;
+        setArgenpropUpdaterCountdown(Math.max(0, newCountdown));
+      } else {
+        const isAnyPending = argenpropUpdateJobs.some(j => j.status === UpdateJobStatus.Pending);
+        if (isAnyPending) setArgenpropUpdaterCountdown(90);
+        else setArgenpropUpdaterCountdown(null);
       }
-      const uiTick = () => {
-          const runningJobs = argenpropUpdateJobs.filter(j => j.status === UpdateJobStatus.Running);
-          if (runningJobs.length > 0 && runningJobs[0].lastRun) {
-              const earliestRun = Math.min(...runningJobs.map(j => j.lastRun!));
-              const secondsElapsed = Math.floor((Date.now() - earliestRun) / 1000);
-              const newCountdown = 90 - secondsElapsed;
-              setArgenpropUpdaterCountdown(Math.max(0, newCountdown));
-          } else {
-              const isAnyPending = argenpropUpdateJobs.some(j => j.status === UpdateJobStatus.Pending);
-              if (isAnyPending) setArgenpropUpdaterCountdown(90);
-              else setArgenpropUpdaterCountdown(null);
-          }
-      };
-      uiTick();
-      argenpropUiCountdownIntervalRef.current = window.setInterval(uiTick, 1000);
-      return () => { if (argenpropUiCountdownIntervalRef.current) clearInterval(argenpropUiCountdownIntervalRef.current); };
+    };
+    uiTick();
+    argenpropUiCountdownIntervalRef.current = window.setInterval(uiTick, 1000);
+    return () => { if (argenpropUiCountdownIntervalRef.current) clearInterval(argenpropUiCountdownIntervalRef.current); };
   }, [isArgenpropUpdaterRunning, argenpropUpdateJobs]);
 
   useEffect(() => {
@@ -768,30 +768,30 @@ export const App: React.FC = () => {
     const today = new Date().toISOString().split('T')[0];
     const storedCountsDate = localStorage.getItem('dailyExecutionCountsDate');
     if (storedCountsDate === today) {
-        const storedCounts = localStorage.getItem('dailyExecutionCounts');
-        if (storedCounts) setDailyExecutionCounts(JSON.parse(storedCounts));
+      const storedCounts = localStorage.getItem('dailyExecutionCounts');
+      if (storedCounts) setDailyExecutionCounts(JSON.parse(storedCounts));
     } else {
-        const initialCounts = { Zonaprop: 0, MercadoLibre: 0, Argenprop: 0 };
-        setDailyExecutionCounts(initialCounts);
-        localStorage.setItem('dailyExecutionCounts', JSON.stringify(initialCounts));
-        localStorage.setItem('dailyExecutionCountsDate', today);
+      const initialCounts = { Zonaprop: 0, MercadoLibre: 0, Argenprop: 0 };
+      setDailyExecutionCounts(initialCounts);
+      localStorage.setItem('dailyExecutionCounts', JSON.stringify(initialCounts));
+      localStorage.setItem('dailyExecutionCountsDate', today);
     }
     const workerInterval = setInterval(async () => {
-        if (isManagingRunRef.current) return;
-        try {
-            isManagingRunRef.current = true;
-            const todayStr = new Date().toISOString().split('T')[0];
-            const activeRun = await findActiveRun(todayStr);
-            if (activeRun) {
-                if (!currentRun || currentRun.id !== activeRun.id) setCurrentRun(activeRun);
-            } else {
-                if (currentRun) setCurrentRun(null);
-            }
-        } catch (e: any) {
-            console.warn("Poller de Scheduler con error de red (ignorado):", e.message);
-        } finally {
-            isManagingRunRef.current = false;
+      if (isManagingRunRef.current) return;
+      try {
+        isManagingRunRef.current = true;
+        const todayStr = new Date().toISOString().split('T')[0];
+        const activeRun = await findActiveRun(todayStr);
+        if (activeRun) {
+          if (!currentRun || currentRun.id !== activeRun.id) setCurrentRun(activeRun);
+        } else {
+          if (currentRun) setCurrentRun(null);
         }
+      } catch (e: any) {
+        console.warn("Poller de Scheduler con error de red (ignorado):", e.message);
+      } finally {
+        isManagingRunRef.current = false;
+      }
     }, 30 * 1000);
     return () => clearInterval(workerInterval);
   }, [currentRun]);
@@ -815,7 +815,7 @@ export const App: React.FC = () => {
       case 'Argenprop': jobs = argenpropUpdateJobs; toggleFn = handleToggleArgenpropUpdater; isRunning = isArgenpropUpdaterRunning; break;
       default: return;
     }
-    
+
     // Solo permitimos al scheduler COMPLETAR portales si localmente ya terminaron,
     // pero NO disparar el inicio.
     const isComplete = jobs.length > 0 && jobs.every(j => j.status === UpdateJobStatus.Completed || j.status === UpdateJobStatus.Failed);
@@ -828,9 +828,9 @@ export const App: React.FC = () => {
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     const counts = {
-        Zonaprop: updateJobs.filter(j => j.status === UpdateJobStatus.Completed).length,
-        MercadoLibre: mercadolibreUpdateJobs.filter(j => j.status === UpdateJobStatus.Completed).length,
-        Argenprop: argenpropUpdateJobs.filter(j => j.status === UpdateJobStatus.Completed).length,
+      Zonaprop: updateJobs.filter(j => j.status === UpdateJobStatus.Completed).length,
+      MercadoLibre: mercadolibreUpdateJobs.filter(j => j.status === UpdateJobStatus.Completed).length,
+      Argenprop: argenpropUpdateJobs.filter(j => j.status === UpdateJobStatus.Completed).length,
     };
     setDailyExecutionCounts(counts);
     localStorage.setItem('dailyExecutionCounts', JSON.stringify(counts));
@@ -844,7 +844,7 @@ export const App: React.FC = () => {
       if (selectedProperty?.id === propertyId) setSelectedProperty(prev => prev ? { ...prev, status } : null);
     } catch (error) { console.error("Failed to update status:", error); }
   }, [selectedProperty]);
-  
+
   const handleBulkUpdate = useCallback(async (propertyIds: string[], updates: Partial<Pick<Property, 'status' | 'is_potential_opportunity'>>) => {
     try {
       await bulkUpdateProperties(propertyIds, updates);
@@ -854,7 +854,7 @@ export const App: React.FC = () => {
 
   const filteredProperties = useMemo(() => {
     if (activeView === 'anomalies') {
-        return allProperties.filter(p => p.price === 0 || !p.total_calculated_sqm || p.total_calculated_sqm === 0 || (p.discountPercentage !== undefined && p.discountPercentage >= 300));
+      return allProperties.filter(p => p.price === 0 || !p.total_calculated_sqm || p.total_calculated_sqm === 0 || (p.discountPercentage !== undefined && p.discountPercentage >= 300));
     }
     const baseProperties = activeView === 'opportunities'
       ? allProperties.filter(p => p.price > 0 && p.total_calculated_sqm !== undefined && p.total_calculated_sqm !== null && p.total_calculated_sqm > 0 && p.calculated_price_per_sqm !== undefined && p.calculated_price_per_sqm <= 1100 && p.calculated_price_per_sqm >= 290 && p.status !== PropertyStatus.Discarded)
@@ -866,7 +866,7 @@ export const App: React.FC = () => {
       if (filter.location !== 'All' && p.zona !== filter.location) return false;
       if (filter.portal !== 'All' && p.portal !== filter.portal) return false;
       if (filter.propertyType !== 'All' && p.propertyType !== filter.propertyType) return false;
-      if (filter.showOnlyDiscarded) { if (p.status !== PropertyStatus.Discarded) return false; } 
+      if (filter.showOnlyDiscarded) { if (p.status !== PropertyStatus.Discarded) return false; }
       else { if (p.status === PropertyStatus.Discarded) return false; if (filter.status !== 'All' && p.status !== filter.status) return false; }
       if (filter.minPrice && p.price < parseFloat(filter.minPrice)) return false;
       if (filter.maxPrice && p.price > parseFloat(filter.maxPrice)) return false;
@@ -884,12 +884,12 @@ export const App: React.FC = () => {
     });
   }, [allProperties, filters, activeView]);
 
-  const handleSelectProperty = (property: Property) => { setSelectedProperty(property); setNewOpportunity(null); };
+  const handleSelectProperty = useCallback((property: Property) => { setSelectedProperty(property); setNewOpportunity(null); }, []);
 
   const handleViewChange = (newView: View) => { startTransition(() => { setActiveView(newView); }); };
 
   const renderView = () => {
-    switch(activeView) {
+    switch (activeView) {
       case 'inventory':
       case 'opportunities':
       case 'anomalies':
@@ -904,10 +904,10 @@ export const App: React.FC = () => {
   };
 
   if (!isSupabaseConfigured) return <SupabaseConfigScreen />;
-  if (isAppLoading) return ( <div className="flex items-center justify-center h-screen bg-[var(--bg-primary)]"> <div className="text-center"> <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--primary-accent)] mx-auto"></div> </div> </div> );
+  if (isAppLoading) return (<div className="flex items-center justify-center h-screen bg-[var(--bg-primary)]"> <div className="text-center"> <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--primary-accent)] mx-auto"></div> </div> </div>);
   if (!session) return <Login />;
-  if (!userProfile) return ( <div className="flex items-center justify-center h-screen bg-[var(--bg-primary)]"> <div className="text-center"> <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--primary-accent)] mx-auto"></div> <p className="mt-4 text-lg text-[var(--text-secondary)]">Cargando perfil de usuario...</p> {error && <p className="mt-2 text-red-400">{error}</p>} </div> </div> );
-  
+  if (!userProfile) return (<div className="flex items-center justify-center h-screen bg-[var(--bg-primary)]"> <div className="text-center"> <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--primary-accent)] mx-auto"></div> <p className="mt-4 text-lg text-[var(--text-secondary)]">Cargando perfil de usuario...</p> {error && <p className="mt-2 text-red-400">{error}</p>} </div> </div>);
+
   return (
     <div className="flex h-screen bg-[var(--bg-primary)] text-white font-sans">
       <Sidebar activeView={activeView} setActiveView={handleViewChange} user={userProfile} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
@@ -915,7 +915,7 @@ export const App: React.FC = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header activeView={activeView} onMenuClick={() => setIsSidebarOpen(true)} onRefresh={loadProperties} />
         <main className={`flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 ${isPending ? 'opacity-70 pointer-events-none' : ''}`}>
-          {error ? ( <div className="text-red-400">Error: {error}</div> ) : isPropertiesLoading ? ( <div className="flex items-center justify-center h-full"> <div className="text-center"> <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--primary-accent)] mx-auto"></div> <p className="mt-4 text-lg text-[var(--text-secondary)]">Cargando propiedades...</p> </div> </div> ) : ( renderView() )}
+          {error ? (<div className="text-red-400">Error: {error}</div>) : isPropertiesLoading ? (<div className="flex items-center justify-center h-full"> <div className="text-center"> <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--primary-accent)] mx-auto"></div> <p className="mt-4 text-lg text-[var(--text-secondary)]">Cargando propiedades...</p> </div> </div>) : (renderView())}
         </main>
       </div>
       {selectedProperty && <PropertyDetailModal property={selectedProperty} onClose={() => setSelectedProperty(null)} onUpdateStatus={handleUpdateStatus} />}

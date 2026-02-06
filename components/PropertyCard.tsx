@@ -17,21 +17,21 @@ interface PropertyCardProps {
 }
 
 const statusPillStyles: { [key in PropertyStatus]: string } = {
-    [PropertyStatus.New]: 'bg-indigo-500',
-    [PropertyStatus.Contacted]: 'bg-blue-500',
-    [PropertyStatus.VisitScheduled]: 'bg-violet-500',
-    [PropertyStatus.Negotiating]: 'bg-amber-500',
-    [PropertyStatus.Acquired]: 'bg-green-500',
-    [PropertyStatus.Discarded]: 'bg-red-500',
+  [PropertyStatus.New]: 'bg-indigo-500',
+  [PropertyStatus.Contacted]: 'bg-blue-500',
+  [PropertyStatus.VisitScheduled]: 'bg-violet-500',
+  [PropertyStatus.Negotiating]: 'bg-amber-500',
+  [PropertyStatus.Acquired]: 'bg-green-500',
+  [PropertyStatus.Discarded]: 'bg-red-500',
 };
 
 
 export const PropertyCard: React.FC<PropertyCardProps> = React.memo(({ property, onSelectProperty, onUpdateStatus, isSelected, onToggleSelection }) => {
-  
+
   const isOpportunity = property.discountPercentage !== undefined && property.discountPercentage <= -30;
 
   return (
-    <div 
+    <div
       className={`bg-[var(--bg-secondary)] rounded-lg overflow-hidden border transition-all duration-300 transform hover:-translate-y-1 cursor-pointer flex flex-col ${isSelected ? 'border-green-500' : 'border-[var(--border-primary)] hover:border-[var(--primary-accent)]'}`}
       onClick={() => onSelectProperty(property)}
     >
@@ -49,34 +49,34 @@ export const PropertyCard: React.FC<PropertyCardProps> = React.memo(({ property,
           }}
           aria-label={`Seleccionar ${property.title}`}
         />
-        <img className="h-48 w-full object-cover" src={property.imageUrl || `https://picsum.photos/seed/prop${property.id}/400/300`} alt={property.title} />
+        <img className="h-48 w-full object-cover" src={property.imageUrl || `https://picsum.photos/seed/prop${property.id}/400/300`} alt={property.title} loading="lazy" decoding="async" />
         {isOpportunity && (
-           <div className="absolute top-2 left-2 bg-green-500 text-black text-xs font-bold px-3 py-1 rounded-full flex items-center shadow-lg">
-             <TagIcon className="h-4 w-4 mr-1"/>
-             Oportunidad ({property.discountPercentage!.toFixed(0)}%)
-           </div>
+          <div className="absolute top-2 left-2 bg-green-500 text-black text-xs font-bold px-3 py-1 rounded-full flex items-center shadow-lg">
+            <TagIcon className="h-4 w-4 mr-1" />
+            Oportunidad ({property.discountPercentage!.toFixed(0)}%)
+          </div>
         )}
       </div>
 
       <div className="p-4 flex flex-col flex-grow">
         <div className="flex justify-between items-start">
-            <div className={`text-xs px-2.5 py-1 rounded-full text-white font-semibold ${statusPillStyles[property.status]}`}>
-                {propertyStatusTranslations[property.status]}
-            </div>
-            <div className="flex items-center space-x-2 text-xs text-[var(--text-secondary)]">
-              {property.portal && (
-                  <span className="flex items-center" title={`Portal: ${property.portal}`}>
-                      <GlobeAltIcon className="h-4 w-4 mr-1" />
-                      {property.portal}
-                  </span>
-              )}
-              {property.days_on_market != null && (
-                   <span title={`${property.days_on_market} días en mercado`}>{property.days_on_market} días</span>
-              )}
-            </div>
+          <div className={`text-xs px-2.5 py-1 rounded-full text-white font-semibold ${statusPillStyles[property.status]}`}>
+            {propertyStatusTranslations[property.status]}
+          </div>
+          <div className="flex items-center space-x-2 text-xs text-[var(--text-secondary)]">
+            {property.portal && (
+              <span className="flex items-center" title={`Portal: ${property.portal}`}>
+                <GlobeAltIcon className="h-4 w-4 mr-1" />
+                {property.portal}
+              </span>
+            )}
+            {property.days_on_market != null && (
+              <span title={`${property.days_on_market} días en mercado`}>{property.days_on_market} días</span>
+            )}
+          </div>
         </div>
         <h3 className="text-lg font-semibold mt-3 text-[var(--text-primary)] truncate" title={property.title}>{property.title}</h3>
-        {property.seller_name && 
+        {property.seller_name &&
           <p className="text-sm text-[var(--text-secondary)] truncate mb-3">{property.seller_name}</p>
         }
         <div className="space-y-2 text-sm text-[var(--text-primary)]">
@@ -88,7 +88,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = React.memo(({ property,
             <PriceIcon className="h-4 w-4 mr-2 text-[var(--text-tertiary)] flex-shrink-0" />
             <span>{property.currency} {property.price.toLocaleString('es-AR')}</span>
           </div>
-           <div className="flex items-center">
+          <div className="flex items-center">
             <AreaIcon className="h-4 w-4 mr-2 text-[var(--text-tertiary)] flex-shrink-0" />
             <span>
               {property.total_calculated_sqm?.toFixed(0) || 0} m²
@@ -97,12 +97,12 @@ export const PropertyCard: React.FC<PropertyCardProps> = React.memo(({ property,
           </div>
         </div>
         <div className="mt-auto pt-4">
-             <button
-                onClick={(e) => { e.stopPropagation(); onSelectProperty(property); }}
-                className="w-full text-center bg-[var(--primary-accent)] hover:bg-[var(--primary-accent-hover)] text-white font-bold py-2 px-4 rounded-md transition-colors"
-             >
-                Ver Detalles
-             </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onSelectProperty(property); }}
+            className="w-full text-center bg-[var(--primary-accent)] hover:bg-[var(--primary-accent-hover)] text-white font-bold py-2 px-4 rounded-md transition-colors"
+          >
+            Ver Detalles
+          </button>
         </div>
       </div>
     </div>

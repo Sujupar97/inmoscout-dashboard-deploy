@@ -149,6 +149,38 @@ export interface Database {
           status?: string;
         };
       };
+      scheduler_config: {
+        Row: {
+          portal: string;
+          is_active: boolean;
+          frequency: number;
+          last_run: string | null;
+          created_at: string;
+          updated_at: string;
+          last_cycle_start: string | null;
+          last_job_run: string | null;
+        };
+        Insert: {
+          portal: string;
+          is_active?: boolean;
+          frequency?: number;
+          last_run?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          last_cycle_start?: string | null;
+          last_job_run?: string | null;
+        };
+        Update: {
+          portal?: string;
+          is_active?: boolean;
+          frequency?: number;
+          last_run?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          last_cycle_start?: string | null;
+          last_job_run?: string | null;
+        };
+      };
       profiles: {
         Row: {
           id: string;
@@ -191,7 +223,7 @@ const supabaseAnonKey: string = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 
 const createSupabaseClient = () => {
   const isConfigured = supabaseUrl && supabaseUrl !== 'YOUR_SUPABASE_URL' && supabaseAnonKey && supabaseAnonKey !== 'YOUR_SUPABASE_ANON_KEY';
-  
+
   if (isConfigured) {
     try {
       // Let the Supabase client automatically detect the fetch implementation.
@@ -202,7 +234,7 @@ const createSupabaseClient = () => {
       return null;
     }
   }
-  
+
   console.warn("La URL de Supabase y la Anon Key no están configuradas. Por favor, actualiza supabase.ts");
   return null;
 };

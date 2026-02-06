@@ -18,35 +18,43 @@ import { CheckCircleIcon } from './icons/CheckCircleIcon';
 const JOB_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours
 const JOB_COOLDOWN_MS = 1 * 60 * 1000; // 1 minute cooldown to prevent spamming
 
+interface SchedulerConfig {
+    portal: string;
+    is_active: boolean;
+    frequency: number;
+    last_run: string | null;
+    last_cycle_start: string | null;
+}
+
 interface ScrapingOrchestratorViewProps {
-  SCRAPER_CONFIG: { name: string; webhook: string }[];
-  TARGET_ZONES: string[];
-  
-  // Zonaprop Props
-  updateJobs: UpdateJob[];
-  isUpdaterRunning: boolean;
-  onToggleUpdater: (isRunning: boolean) => void;
-  onResetUpdater: () => void;
-  updaterCountdown: number | null;
-  onManualUpdateTrigger: (jobId: string) => void;
+    SCRAPER_CONFIG: { name: string; webhook: string }[];
+    TARGET_ZONES: string[];
 
-  // MercadoLibre Props
-  mercadolibreUpdateJobs: UpdateJob[];
-  isMercadolibreUpdaterRunning: boolean;
-  onToggleMercadolibreUpdater: (isRunning: boolean) => void;
-  onResetMercadolibreUpdater: () => void;
-  mercadolibreUpdaterCountdown: number | null;
-  onManualMercadolibreUpdateTrigger: (jobId: string) => void;
+    // Zonaprop Props
+    updateJobs: UpdateJob[];
+    isUpdaterRunning: boolean;
+    onToggleUpdater: (isRunning: boolean) => void;
+    onResetUpdater: () => void;
+    updaterCountdown: number | null;
+    onManualUpdateTrigger: (jobId: string) => void;
 
-  // Argenprop Props
-  argenpropUpdateJobs: UpdateJob[];
-  isArgenpropUpdaterRunning: boolean;
-  onToggleArgenpropUpdater: (isRunning: boolean) => void;
-  onResetArgenpropUpdater: () => void;
-  argenpropUpdaterCountdown: number | null;
-  onManualArgenpropUpdateTrigger: (jobId: string) => void;
-  
-  dailyExecutionCounts: { [portal: string]: number };
+    // MercadoLibre Props
+    mercadolibreUpdateJobs: UpdateJob[];
+    isMercadolibreUpdaterRunning: boolean;
+    onToggleMercadolibreUpdater: (isRunning: boolean) => void;
+    onResetMercadolibreUpdater: () => void;
+    mercadolibreUpdaterCountdown: number | null;
+    onManualMercadolibreUpdateTrigger: (jobId: string) => void;
+
+    // Argenprop Props
+    argenpropUpdateJobs: UpdateJob[];
+    isArgenpropUpdaterRunning: boolean;
+    onToggleArgenpropUpdater: (isRunning: boolean) => void;
+    onResetArgenpropUpdater: () => void;
+    argenpropUpdaterCountdown: number | null;
+    onManualArgenpropUpdateTrigger: (jobId: string) => void;
+
+    dailyExecutionCounts: { [portal: string]: number };
 }
 
 const StatCard: React.FC<{ title: string; value: string | number; color: string }> = ({ title, value, color }) => (
@@ -60,8 +68,8 @@ const inputBaseClasses = "w-full bg-[var(--bg-tertiary)] border-[var(--border-pr
 const selectBaseClasses = "appearance-none w-full bg-[var(--bg-tertiary)] border border-[var(--border-primary)] rounded-md shadow-sm py-2 px-3 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-accent)] focus:border-[var(--primary-accent)] sm:text-sm";
 
 
-export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> = ({ 
-    SCRAPER_CONFIG, 
+export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> = ({
+    SCRAPER_CONFIG,
     TARGET_ZONES,
     updateJobs,
     isUpdaterRunning,
@@ -97,6 +105,66 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
     const [manualType, setManualType] = useState(PROPERTY_TYPES[0] || '');
     const [isManualLoading, setIsManualLoading] = useState(false);
     const [manualFeedback, setManualFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+    // --- Scheduler Config State ---
+    const [schedulerConfigs, setSchedulerConfigs] = useState<SchedulerConfig[]>([]);
+    const [isSchedulerLoading, setIsSchedulerLoading] = useState(true);
+
+    useEffect(() => {
+        if (!supabase) return;
+
+        const fetchSchedulerConfig = async () => {
+            const { data, error } = await supabase
+                .from('scheduler_config')
+                .select('*')
+                .order('portal');
+
+            if (data) setSchedulerConfigs(data);
+            setIsSchedulerLoading(false);
+        };
+
+        fetchSchedulerConfig();
+
+        // Realtime subscription for config changes
+        const channel = supabase.channel('scheduler_config_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'scheduler_config' }, (payload) => {
+                fetchSchedulerConfig();
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, []);
+
+    const toggleAutomation = async (portal: string, currentState: boolean) => {
+        if (!supabase) return;
+        await supabase
+            .from('scheduler_config')
+            .update({ is_active: !currentState })
+            .eq('portal', portal);
+    };
+
+    const updateFrequency = async (portal: string, frequency: number) => {
+        if (!supabase) return;
+        await supabase
+            .from('scheduler_config')
+            .update({ frequency })
+            .eq('portal', portal);
+    };
+
+    const triggerAutomationNow = async () => {
+        if (!window.confirm("¿Ejecutar el sistema automatizado ahora? Esto disparará los scrapers activos inmediatamente.")) return;
+
+        try {
+            const { data, error } = await supabase.functions.invoke('trigger-scrapers', {
+                body: { manualTrigger: true }
+            });
+
+            if (error) throw error;
+            alert(`Ejecución iniciada: ${JSON.stringify(data)}`);
+        } catch (e: any) {
+            alert(`Error al ejecutar: ${e.message}`);
+        }
+    };
 
     // --- Daily Updater Logic ---
     const updaterStats = useMemo(() => {
@@ -189,7 +257,7 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                 const { error: insertError } = await supabase
                     .from('scraping_jobs')
                     .insert(newJobsToInsert as any);
-                
+
                 if (insertError) {
                     console.error("Error inserting new jobs:", insertError);
                     setManualFeedback({ type: 'error', message: 'No se pudieron sincronizar algunos trabajos nuevos.' });
@@ -200,7 +268,7 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
         };
         syncAndLoadJobs();
     }, [SCRAPER_CONFIG, TARGET_ZONES]);
-    
+
     const handleManualSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsManualLoading(true);
@@ -228,7 +296,7 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
             });
 
             if (!response.ok) {
-                 throw new Error(`La solicitud al webhook falló con el estado ${response.status}`);
+                throw new Error(`La solicitud al webhook falló con el estado ${response.status}`);
             }
 
             setManualFeedback({ type: 'success', message: 'Prueba de scraping iniciada exitosamente.' });
@@ -240,7 +308,7 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
     };
 
     const handleTriggerPortal = (portalName: string) => {
-        const message = portalName === 'Zonaprop' 
+        const message = portalName === 'Zonaprop'
             ? `¿Estás seguro de que quieres disparar el scraping general para ${portalName}?`
             : `¿Estás seguro de que quieres disparar todos los jobs para ${portalName}? Se pondrán en la cola y se iniciará el orquestador si está pausado.`;
 
@@ -251,14 +319,14 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
         if (portalName === 'Zonaprop') {
             const zonapropWebhook = 'https://n8n.srv1022992.hstgr.cloud/webhook/750e883c-85ce-4995-8537-161dd63e3890';
             setManualFeedback({ type: 'success', message: `Iniciando scraping general para Zonaprop...` });
-            
+
             fetch(zonapropWebhook, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ trigger: 'general-zonaprop-scrape' }) 
+                body: JSON.stringify({ trigger: 'general-zonaprop-scrape' })
             }).then(response => {
                 if (!response.ok) {
-                     throw new Error(`El envío del Webhook falló con el estado ${response.status}`);
+                    throw new Error(`El envío del Webhook falló con el estado ${response.status}`);
                 }
                 setManualFeedback({ type: 'success', message: 'Scraping para Zonaprop iniciado correctamente.' });
                 // Set jobs to pending so user sees activity
@@ -322,7 +390,7 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
             setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: ScrapingJobStatus.Failed, errorMessage: error.message } : j));
         }
     }, [SCRAPER_CONFIG]);
-    
+
     const handleManualJobTrigger = (jobId: string) => {
         const jobToRun = jobs.find(j => j.id === jobId);
         if (!jobToRun) {
@@ -355,39 +423,39 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
         if (!supabase) return;
         const channel = supabase.channel('scraping-jobs-status');
         const subscription = channel
-          .on('broadcast', { event: 'job-update' }, ({ payload }) => {
-            console.log('Received job update:', payload);
-            if (payload && payload.jobId && payload.status) {
-              setJobs(prevJobs => {
-                const jobExists = prevJobs.some(j => j.id === payload.jobId);
-                if (!jobExists) return prevJobs;
-                return prevJobs.map(job => {
-                  if (job.id === payload.jobId) {
-                    const finalDuration = job.status === ScrapingJobStatus.Running && job.lastRun 
-                        ? Math.floor((Date.now() - job.lastRun) / 1000) 
-                        : job.duration;
-                    return {
-                      ...job,
-                      status: payload.status as ScrapingJobStatus,
-                      errorMessage: payload.errorMessage || undefined,
-                      duration: finalDuration
-                    };
-                  }
-                  return job;
-                });
-              });
-              if (payload.status === ScrapingJobStatus.Completed) {
-                  fetchCounts();
-              }
-            }
-          })
-          .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-              console.log('Subscribed to real-time scraping job status channel.');
-            }
-          });
+            .on('broadcast', { event: 'job-update' }, ({ payload }) => {
+                console.log('Received job update:', payload);
+                if (payload && payload.jobId && payload.status) {
+                    setJobs(prevJobs => {
+                        const jobExists = prevJobs.some(j => j.id === payload.jobId);
+                        if (!jobExists) return prevJobs;
+                        return prevJobs.map(job => {
+                            if (job.id === payload.jobId) {
+                                const finalDuration = job.status === ScrapingJobStatus.Running && job.lastRun
+                                    ? Math.floor((Date.now() - job.lastRun) / 1000)
+                                    : job.duration;
+                                return {
+                                    ...job,
+                                    status: payload.status as ScrapingJobStatus,
+                                    errorMessage: payload.errorMessage || undefined,
+                                    duration: finalDuration
+                                };
+                            }
+                            return job;
+                        });
+                    });
+                    if (payload.status === ScrapingJobStatus.Completed) {
+                        fetchCounts();
+                    }
+                }
+            })
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('Subscribed to real-time scraping job status channel.');
+                }
+            });
         return () => {
-          supabase.removeChannel(subscription);
+            supabase.removeChannel(subscription);
         };
     }, [fetchCounts]);
 
@@ -418,12 +486,12 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
             dispatchJob(nextJob);
         }
     }, [jobs, isOrchestratorPaused, lastRunTimestamps, dispatchJob]);
-    
+
     const handleJobStatusChange = async (jobId: string, newStatus: ScrapingJobStatus) => {
         const originalJobs = [...jobs];
-        setJobs(prevJobs => prevJobs.map(job => 
-            job.id === jobId 
-                ? { ...job, status: newStatus, errorMessage: newStatus !== ScrapingJobStatus.Failed ? undefined : job.errorMessage } 
+        setJobs(prevJobs => prevJobs.map(job =>
+            job.id === jobId
+                ? { ...job, status: newStatus, errorMessage: newStatus !== ScrapingJobStatus.Failed ? undefined : job.errorMessage }
                 : job
         ));
         if (!supabase) {
@@ -442,12 +510,12 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
             setManualFeedback({ type: 'error', message: `No se pudo guardar el estado para el job ${jobId}.` });
         }
     };
-    
+
     const handleRetryFailed = () => {
         if (window.confirm("¿Estás seguro de que quieres reintentar todos los trabajos fallidos?")) {
-            setJobs(prevJobs => prevJobs.map(job => 
-                job.status === ScrapingJobStatus.Failed 
-                    ? { ...job, status: ScrapingJobStatus.Pending, errorMessage: undefined } 
+            setJobs(prevJobs => prevJobs.map(job =>
+                job.status === ScrapingJobStatus.Failed
+                    ? { ...job, status: ScrapingJobStatus.Pending, errorMessage: undefined }
                     : job
             ));
         }
@@ -480,6 +548,70 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
 
     return (
         <div className="space-y-6">
+            {/* Automation Configuration Panel */}
+            <div className="bg-[var(--bg-secondary)] p-4 sm:p-6 rounded-lg border border-[var(--border-primary)]">
+                <div className="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 className="text-xl font-bold text-[var(--text-primary)]">Configuración de Automatización</h2>
+                        <p className="text-sm text-[var(--text-secondary)]">Gestiona la ejecución automática de los scrapers.</p>
+                    </div>
+                    <button
+                        onClick={triggerAutomationNow}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-colors flex items-center shadow-lg"
+                    >
+                        <RocketIcon className="h-5 w-5 mr-2" />
+                        Ejecutar Ahora
+                    </button>
+                </div>
+
+                {isSchedulerLoading ? (
+                    <div className="text-center py-4 text-[var(--text-secondary)]">Cargando configuración...</div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {schedulerConfigs.map(config => (
+                            <div key={config.portal} className={`p-4 rounded-lg border ${config.is_active ? 'border-green-500/50 bg-green-500/5' : 'border-[var(--border-primary)] bg-[var(--bg-primary)]'}`}>
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="font-bold text-[var(--text-primary)]">{config.portal}</h3>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={config.is_active}
+                                            onChange={() => toggleAutomation(config.portal, config.is_active)}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                    </label>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-xs text-[var(--text-secondary)] uppercase font-semibold">Frecuencia (veces al día)</label>
+                                        <select
+                                            value={config.frequency}
+                                            onChange={(e) => updateFrequency(config.portal, parseInt(e.target.value))}
+                                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-600 bg-[var(--bg-tertiary)] text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md"
+                                        >
+                                            {[1, 2, 3, 4, 6, 8, 12, 24].map(n => (
+                                                <option key={n} value={n}>{n} veces ({24 / n}h)</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="text-xs text-[var(--text-secondary)]">
+                                        <div className="flex justify-between">
+                                            <span>Última ejecución:</span>
+                                            <span className="text-[var(--text-primary)]">{config.last_job_run ? new Date(config.last_job_run).toLocaleTimeString() : '-'}</span>
+                                        </div>
+                                        <div className="flex justify-between mt-1">
+                                            <span>Ciclo actual:</span>
+                                            <span className="text-[var(--text-primary)]">{config.last_cycle_start ? new Date(config.last_cycle_start).toLocaleDateString() : '-'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
             <div className="bg-[var(--bg-secondary)] p-4 sm:p-6 rounded-lg border border-[var(--border-primary)]">
                 <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Estado de Ejecuciones Diarias</h2>
                 <p className="text-sm text-[var(--text-secondary)] mb-4">Resumen de los trabajos de actualización completados hoy. Se reinicia cada día.</p>
@@ -504,7 +636,7 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                 <p className="text-sm text-[var(--text-secondary)] mb-4">Dispara un scraper individual para pruebas o para obtener datos específicos de inmediato.</p>
                 <form onSubmit={handleManualSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <div>
+                        <div>
                             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Portal</label>
                             <div className="relative">
                                 <select value={manualPortal} onChange={(e) => setManualPortal(e.target.value)} className={selectBaseClasses}>
@@ -519,7 +651,7 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Zona</label>
-                             <div className="relative">
+                            <div className="relative">
                                 <select value={manualZone} onChange={(e) => setManualZone(e.target.value)} className={selectBaseClasses}>
                                     {TARGET_ZONES.map(z => <option key={z} value={z}>{z}</option>)}
                                 </select>
@@ -528,7 +660,7 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Tipo de Propiedad</label>
-                             <div className="relative">
+                            <div className="relative">
                                 <select value={manualType} onChange={(e) => setManualType(e.target.value)} className={selectBaseClasses}>
                                     {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
@@ -549,7 +681,7 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                     </div>
                 </form>
             </div>
-            
+
             <details className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)] overflow-hidden" open>
                 <summary className="p-4 cursor-pointer hover:bg-[var(--bg-tertiary)] flex justify-between items-center">
                     <div className="flex items-center gap-4">
@@ -563,8 +695,8 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                     </p>
                     <div className="bg-[var(--bg-primary)] p-4 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="text-center sm:text-left">
-                           <p className="font-bold text-lg text-[var(--text-primary)]">Progreso de Hoy</p>
-                           <p className="text-sm text-[var(--text-secondary)]">{updaterStats.completed} de {updaterStats.total} completados ({updaterStats.failed} fallidos)</p>
+                            <p className="font-bold text-lg text-[var(--text-primary)]">Progreso de Hoy</p>
+                            <p className="text-sm text-[var(--text-secondary)]">{updaterStats.completed} de {updaterStats.total} completados ({updaterStats.failed} fallidos)</p>
                         </div>
 
                         {isUpdaterRunning && updaterCountdown !== null && (
@@ -615,9 +747,9 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                                                 {job.status}
                                                 {job.status === UpdateJobStatus.Failed && job.errorMessage && (
                                                     <div className="relative group ml-2">
-                                                      <ExclamationCircleIcon className="h-4 w-4 text-red-400" />
-                                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-gray-600 shadow-lg">{job.errorMessage}</div>
-                                                  </div>
+                                                        <ExclamationCircleIcon className="h-4 w-4 text-red-400" />
+                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-gray-600 shadow-lg">{job.errorMessage}</div>
+                                                    </div>
                                                 )}
                                             </td>
                                             <td className="px-4 py-2 whitespace-nowrap text-center">
@@ -652,8 +784,8 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                     </p>
                     <div className="bg-[var(--bg-primary)] p-4 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="text-center sm:text-left">
-                           <p className="font-bold text-lg text-[var(--text-primary)]">Progreso de Hoy</p>
-                           <p className="text-sm text-[var(--text-secondary)]">{mercadolibreUpdaterStats.completed} de {mercadolibreUpdaterStats.total} completados ({mercadolibreUpdaterStats.failed} fallidos)</p>
+                            <p className="font-bold text-lg text-[var(--text-primary)]">Progreso de Hoy</p>
+                            <p className="text-sm text-[var(--text-secondary)]">{mercadolibreUpdaterStats.completed} de {mercadolibreUpdaterStats.total} completados ({mercadolibreUpdaterStats.failed} fallidos)</p>
                         </div>
 
                         {isMercadolibreUpdaterRunning && (
@@ -704,9 +836,9 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                                                 {job.status}
                                                 {job.status === UpdateJobStatus.Failed && job.errorMessage && (
                                                     <div className="relative group ml-2">
-                                                      <ExclamationCircleIcon className="h-4 w-4 text-red-400" />
-                                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-gray-600 shadow-lg">{job.errorMessage}</div>
-                                                  </div>
+                                                        <ExclamationCircleIcon className="h-4 w-4 text-red-400" />
+                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-gray-600 shadow-lg">{job.errorMessage}</div>
+                                                    </div>
                                                 )}
                                             </td>
                                             <td className="px-4 py-2 whitespace-nowrap text-center">
@@ -741,8 +873,8 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                     </p>
                     <div className="bg-[var(--bg-primary)] p-4 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="text-center sm:text-left">
-                           <p className="font-bold text-lg text-[var(--text-primary)]">Progreso de Hoy</p>
-                           <p className="text-sm text-[var(--text-secondary)]">{argenpropUpdaterStats.completed} de {argenpropUpdaterStats.total} completados ({argenpropUpdaterStats.failed} fallidos)</p>
+                            <p className="font-bold text-lg text-[var(--text-primary)]">Progreso de Hoy</p>
+                            <p className="text-sm text-[var(--text-secondary)]">{argenpropUpdaterStats.completed} de {argenpropUpdaterStats.total} completados ({argenpropUpdaterStats.failed} fallidos)</p>
                         </div>
 
                         {isArgenpropUpdaterRunning && (
@@ -793,9 +925,9 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                                                 {job.status}
                                                 {job.status === UpdateJobStatus.Failed && job.errorMessage && (
                                                     <div className="relative group ml-2">
-                                                      <ExclamationCircleIcon className="h-4 w-4 text-red-400" />
-                                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-gray-600 shadow-lg">{job.errorMessage}</div>
-                                                  </div>
+                                                        <ExclamationCircleIcon className="h-4 w-4 text-red-400" />
+                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-gray-600 shadow-lg">{job.errorMessage}</div>
+                                                    </div>
                                                 )}
                                             </td>
                                             <td className="px-4 py-2 whitespace-nowrap text-center">
@@ -826,7 +958,7 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
             </div>
 
             <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-primary)] flex flex-col sm:flex-row items-center justify-between gap-4">
-                 <button onClick={() => setIsOrchestratorPaused(!isOrchestratorPaused)} className={`w-full sm:w-auto font-bold py-2 px-4 rounded-md transition-colors flex items-center justify-center ${isOrchestratorPaused ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}>
+                <button onClick={() => setIsOrchestratorPaused(!isOrchestratorPaused)} className={`w-full sm:w-auto font-bold py-2 px-4 rounded-md transition-colors flex items-center justify-center ${isOrchestratorPaused ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}>
                     {isOrchestratorPaused ? <><PlayIcon className="h-5 w-5 mr-2" /> Reanudar Orquestador</> : <><PauseIcon className="h-5 w-5 mr-2" /> Pausar Orquestador</>}
                 </button>
                 <div className="flex space-x-2">
@@ -835,97 +967,97 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
             </div>
 
             <div className="space-y-4">
-              {isLoadingJobs ? (
-                  <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)] p-8 text-center">
-                      <p className="text-[var(--text-secondary)]">Sincronizando trabajos del orquestador...</p>
-                  </div>
-              ) : (
-                SCRAPER_CONFIG.map(portalConfig => (
-                  <details key={portalConfig.name} className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)] overflow-hidden" open>
-                    <summary className="p-4 cursor-pointer hover:bg-[var(--bg-tertiary)] flex justify-between items-center">
-                        <div className="flex items-center gap-4">
-                          <h3 className="text-lg font-semibold text-[var(--text-primary)]">{portalConfig.name}</h3>
-                          <button
-                              onClick={(e) => {
-                                  e.preventDefault();
-                                  handleTriggerPortal(portalConfig.name);
-                              }}
-                              className="bg-cyan-600/50 hover:bg-cyan-600 text-white text-xs font-bold py-1 px-3 rounded-md transition-colors flex items-center gap-2"
-                              title={`Disparar todos los jobs para ${portalConfig.name}`}
-                          >
-                              <RocketIcon className="h-4 w-4" />
-                              Disparar Portal
-                          </button>
-                        </div>
-                        <ChevronDownIcon className="h-5 w-5 transition-transform transform details-open:rotate-180" />
-                    </summary>
-                     <div className="overflow-x-auto border-t border-[var(--border-primary)]">
-                          <table className="min-w-full divide-y divide-[var(--border-primary)]">
-                               <thead className="bg-[var(--bg-tertiary)]/50">
-                                  <tr>
-                                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Zona</th>
-                                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Tipo Prop.</th>
-                                      <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-[var(--text-secondary)] uppercase">Prop. Hoy</th>
-                                      <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-[var(--text-secondary)] uppercase">Duración</th>
-                                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Estado</th>
-                                      <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-[var(--text-secondary)] uppercase">Acciones</th>
-                                  </tr>
-                              </thead>
-                              <tbody className="divide-y divide-[var(--border-primary)]">
-                                 {(jobsByPortal[portalConfig.name] || []).map(job => {
-                                     const statusColors: Record<ScrapingJobStatus, string> = {
-                                          [ScrapingJobStatus.Pending]: "text-[var(--text-tertiary)]",
-                                          [ScrapingJobStatus.Running]: "text-yellow-400 animate-pulse",
-                                          [ScrapingJobStatus.Completed]: "text-green-400",
-                                          [ScrapingJobStatus.Failed]: "text-red-400",
-                                          [ScrapingJobStatus.Paused]: "text-blue-400",
-                                     };
-                                     return (
-                                      <tr key={job.id} className="hover:bg-[var(--bg-tertiary)]">
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{job.zona}</td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)]">{job.propertyType}</td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)] text-right font-mono">{todaysCounts.get(job.zona) || 0}</td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)] text-right font-mono">{formatDuration(job.duration)}</td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold flex items-center">
-                                              <span className={statusColors[job.status]}>{job.status}</span>
-                                              {job.status === ScrapingJobStatus.Failed && job.errorMessage && (
-                                                  <div className="relative group ml-2">
-                                                      <ExclamationCircleIcon className="h-4 w-4 text-red-400" />
-                                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-gray-600 shadow-lg">{job.errorMessage}</div>
-                                                  </div>
-                                              )}
-                                          </td>
-                                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-center">
-                                              <div className="flex items-center justify-center space-x-2">
-                                                  <button onClick={() => handleManualJobTrigger(job.id)} className="p-1.5 rounded-md hover:bg-[var(--bg-primary)] disabled:opacity-30 disabled:cursor-not-allowed" title="Ejecutar Manualmente" disabled={job.status === ScrapingJobStatus.Running}>
-                                                      <PlayIcon className="h-4 w-4 text-green-400"/>
-                                                  </button>
-                                                  <div className="relative group">
-                                                      <select 
-                                                          value={job.status} 
-                                                          onChange={(e) => handleJobStatusChange(job.id, e.target.value as ScrapingJobStatus)}
-                                                          className="bg-transparent text-transparent appearance-none cursor-pointer p-1.5 rounded-md hover:bg-[var(--bg-primary)] focus:outline-none"
-                                                          title="Cambiar Estado Manualmente"
-                                                      >
-                                                          {Object.values(ScrapingJobStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                                                      </select>
-                                                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                           <WifiIcon className="h-4 w-4 text-[var(--text-secondary)]" />
-                                                       </div>
-                                                  </div>
-                                              </div>
-                                          </td>
-                                      </tr>
-                                     )
-                                 })}
-                              </tbody>
-                          </table>
-                      </div>
-                  </details>
-                ))
-              )}
+                {isLoadingJobs ? (
+                    <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)] p-8 text-center">
+                        <p className="text-[var(--text-secondary)]">Sincronizando trabajos del orquestador...</p>
+                    </div>
+                ) : (
+                    SCRAPER_CONFIG.map(portalConfig => (
+                        <details key={portalConfig.name} className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-primary)] overflow-hidden" open>
+                            <summary className="p-4 cursor-pointer hover:bg-[var(--bg-tertiary)] flex justify-between items-center">
+                                <div className="flex items-center gap-4">
+                                    <h3 className="text-lg font-semibold text-[var(--text-primary)]">{portalConfig.name}</h3>
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            handleTriggerPortal(portalConfig.name);
+                                        }}
+                                        className="bg-cyan-600/50 hover:bg-cyan-600 text-white text-xs font-bold py-1 px-3 rounded-md transition-colors flex items-center gap-2"
+                                        title={`Disparar todos los jobs para ${portalConfig.name}`}
+                                    >
+                                        <RocketIcon className="h-4 w-4" />
+                                        Disparar Portal
+                                    </button>
+                                </div>
+                                <ChevronDownIcon className="h-5 w-5 transition-transform transform details-open:rotate-180" />
+                            </summary>
+                            <div className="overflow-x-auto border-t border-[var(--border-primary)]">
+                                <table className="min-w-full divide-y divide-[var(--border-primary)]">
+                                    <thead className="bg-[var(--bg-tertiary)]/50">
+                                        <tr>
+                                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Zona</th>
+                                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Tipo Prop.</th>
+                                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-[var(--text-secondary)] uppercase">Prop. Hoy</th>
+                                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-[var(--text-secondary)] uppercase">Duración</th>
+                                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Estado</th>
+                                            <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-[var(--text-secondary)] uppercase">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[var(--border-primary)]">
+                                        {(jobsByPortal[portalConfig.name] || []).map(job => {
+                                            const statusColors: Record<ScrapingJobStatus, string> = {
+                                                [ScrapingJobStatus.Pending]: "text-[var(--text-tertiary)]",
+                                                [ScrapingJobStatus.Running]: "text-yellow-400 animate-pulse",
+                                                [ScrapingJobStatus.Completed]: "text-green-400",
+                                                [ScrapingJobStatus.Failed]: "text-red-400",
+                                                [ScrapingJobStatus.Paused]: "text-blue-400",
+                                            };
+                                            return (
+                                                <tr key={job.id} className="hover:bg-[var(--bg-tertiary)]">
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-[var(--text-primary)]">{job.zona}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)]">{job.propertyType}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)] text-right font-mono">{todaysCounts.get(job.zona) || 0}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--text-secondary)] text-right font-mono">{formatDuration(job.duration)}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold flex items-center">
+                                                        <span className={statusColors[job.status]}>{job.status}</span>
+                                                        {job.status === ScrapingJobStatus.Failed && job.errorMessage && (
+                                                            <div className="relative group ml-2">
+                                                                <ExclamationCircleIcon className="h-4 w-4 text-red-400" />
+                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-black text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 border border-gray-600 shadow-lg">{job.errorMessage}</div>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-center">
+                                                        <div className="flex items-center justify-center space-x-2">
+                                                            <button onClick={() => handleManualJobTrigger(job.id)} className="p-1.5 rounded-md hover:bg-[var(--bg-primary)] disabled:opacity-30 disabled:cursor-not-allowed" title="Ejecutar Manualmente" disabled={job.status === ScrapingJobStatus.Running}>
+                                                                <PlayIcon className="h-4 w-4 text-green-400" />
+                                                            </button>
+                                                            <div className="relative group">
+                                                                <select
+                                                                    value={job.status}
+                                                                    onChange={(e) => handleJobStatusChange(job.id, e.target.value as ScrapingJobStatus)}
+                                                                    className="bg-transparent text-transparent appearance-none cursor-pointer p-1.5 rounded-md hover:bg-[var(--bg-primary)] focus:outline-none"
+                                                                    title="Cambiar Estado Manualmente"
+                                                                >
+                                                                    {Object.values(ScrapingJobStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                                                                </select>
+                                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                                    <WifiIcon className="h-4 w-4 text-[var(--text-secondary)]" />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
+                    ))
+                )}
             </div>
-            
+
             <style>{`
                 details > summary { list-style: none; }
                 details > summary::-webkit-details-marker { display: none; }

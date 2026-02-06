@@ -8,7 +8,7 @@ interface AIChatWidgetProps {
   onSelectProperty: (property: Property) => void;
 }
 
-export const AIChatWidget: React.FC<AIChatWidgetProps> = ({ properties, onSelectProperty }) => {
+export const AIChatWidget: React.FC<AIChatWidgetProps> = React.memo(({ properties, onSelectProperty }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -20,7 +20,7 @@ export const AIChatWidget: React.FC<AIChatWidgetProps> = ({ properties, onSelect
   };
 
   useEffect(scrollToBottom, [messages]);
-  
+
   const handleToggle = () => setIsOpen(!isOpen);
 
   const handlePropertyClick = (propertyId: string) => {
@@ -42,7 +42,7 @@ export const AIChatWidget: React.FC<AIChatWidgetProps> = ({ properties, onSelect
 
     try {
       const aiResponse = await answerQuestionAboutProperties(input, properties);
-      
+
       let aiMessage: ChatMessage;
       if (typeof aiResponse === 'string') {
         aiMessage = { id: Date.now() + 1, sender: 'ai', type: 'text', text: aiResponse };
@@ -75,11 +75,11 @@ export const AIChatWidget: React.FC<AIChatWidgetProps> = ({ properties, onSelect
           <h3 className="font-bold text-[var(--text-primary)]">Asistente IA</h3>
           <button onClick={handleToggle} className="text-[var(--text-secondary)] hover:text-white p-2 -mr-2">&times;</button>
         </div>
-        
+
         <div className="flex-grow p-4 overflow-y-auto space-y-4">
           {messages.length === 0 && (
-             <div className="text-center text-[var(--text-tertiary)] h-full flex items-center justify-center">
-                <p className="text-sm">Haz una pregunta sobre las propiedades. <br/>Ej: "¿Cuál es la más cara en Caballito?"</p>
+            <div className="text-center text-[var(--text-tertiary)] h-full flex items-center justify-center">
+              <p className="text-sm">Haz una pregunta sobre las propiedades. <br />Ej: "¿Cuál es la más cara en Caballito?"</p>
             </div>
           )}
           {messages.map((msg) => (
@@ -91,7 +91,7 @@ export const AIChatWidget: React.FC<AIChatWidgetProps> = ({ properties, onSelect
                   <div className="space-y-2">
                     <p className="text-sm font-semibold mb-2">Aquí tienes los resultados:</p>
                     {msg.properties.map(p => (
-                      <button 
+                      <button
                         key={p.id}
                         onClick={() => handlePropertyClick(p.id)}
                         className="w-full text-left bg-gray-600 hover:bg-gray-500 p-2 rounded-md transition-colors"
@@ -106,19 +106,19 @@ export const AIChatWidget: React.FC<AIChatWidgetProps> = ({ properties, onSelect
             </div>
           ))}
           {loading && (
-             <div className="flex justify-start">
-               <div className="max-w-xs md:max-w-sm px-4 py-2 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)]">
-                  <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                  </div>
-               </div>
-             </div>
+            <div className="flex justify-start">
+              <div className="max-w-xs md:max-w-sm px-4 py-2 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)]">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+              </div>
+            </div>
           )}
           <div ref={messagesEndRef} />
         </div>
-        
+
         <form onSubmit={handleSubmit} className="p-2 sm:p-4 border-t border-[var(--border-primary)]">
           <input
             type="text"
@@ -132,4 +132,4 @@ export const AIChatWidget: React.FC<AIChatWidgetProps> = ({ properties, onSelect
       </div>
     </>
   );
-};
+});

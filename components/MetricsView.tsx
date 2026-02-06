@@ -9,7 +9,7 @@ import { TimeSeriesChart } from './charts/TimeSeriesChart';
 import { FunnelChart } from './charts/FunnelChart';
 
 interface MetricsViewProps {
-  properties: Property[];
+    properties: Property[];
 }
 
 // Sub-componentes
@@ -26,23 +26,22 @@ const StatCard: React.FC<{ icon: React.ElementType, title: string, value: string
 );
 
 const DateRangeButton: React.FC<{
-  days: number;
-  label: string;
-  currentDateRange: number;
-  setDateRange: (days: number) => void;
+    days: number;
+    label: string;
+    currentDateRange: number;
+    setDateRange: (days: number) => void;
 }> = ({ days, label, currentDateRange, setDateRange }) => (
     <button
         onClick={() => setDateRange(days)}
-        className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-            currentDateRange === days ? 'bg-[var(--primary-accent)] text-white shadow-md' : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-primary)]'
-        }`}
+        className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${currentDateRange === days ? 'bg-[var(--primary-accent)] text-white shadow-md' : 'bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-primary)]'
+            }`}
     >
-      {label}
+        {label}
     </button>
 );
 
 
-export const MetricsView: React.FC<MetricsViewProps> = ({ properties }) => {
+export const MetricsView: React.FC<MetricsViewProps> = React.memo(({ properties }) => {
     const [dateRange, setDateRange] = useState(30); // Default to 30d
 
     const filteredProperties = useMemo(() => {
@@ -50,7 +49,7 @@ export const MetricsView: React.FC<MetricsViewProps> = ({ properties }) => {
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
         if (dateRange === 0) return properties; // 0 for "All time"
-        
+
         const cutoffDate = new Date(todayStart);
         cutoffDate.setDate(todayStart.getDate() - (dateRange - 1));
 
@@ -63,15 +62,15 @@ export const MetricsView: React.FC<MetricsViewProps> = ({ properties }) => {
 
     const metrics = useMemo(() => {
         const propertiesForStats = filteredProperties.filter(p => p.status !== PropertyStatus.Discarded);
-    
+
         const opportunities = propertiesForStats.filter(p => p.discountPercentage !== undefined && p.discountPercentage < 0);
         const strongOpportunities = opportunities.filter(p => p.discountPercentage !== undefined && p.discountPercentage <= -30);
-        
+
         const validSqmProps = propertiesForStats.filter(p => p.calculated_price_per_sqm && p.calculated_price_per_sqm > 0);
         const avgSqmPrice = validSqmProps.reduce((sum, p) => sum + p.calculated_price_per_sqm!, 0) / (validSqmProps.length || 1);
 
         const avgDiscount = opportunities.reduce((sum, p) => sum + p.discountPercentage!, 0) / (opportunities.length || 1);
-        
+
         // For TimeSeriesChart - Counts all properties added in the period, regardless of status
         const dateCounts = filteredProperties.reduce<Record<string, number>>((acc, p) => {
             if (!p.created_at) return acc;
@@ -82,7 +81,7 @@ export const MetricsView: React.FC<MetricsViewProps> = ({ properties }) => {
         const timeSeriesData = Object.entries(dateCounts)
             .map(([date, value]) => ({ date: new Date(date), value }))
             .sort((a, b) => a.date.getTime() - b.date.getTime());
-    
+
         // For FunnelChart - Based on non-discarded properties
         const funnelData = [
             { label: 'Propiedades Analizadas', value: propertiesForStats.length },
@@ -124,8 +123,8 @@ export const MetricsView: React.FC<MetricsViewProps> = ({ properties }) => {
             acc[portal].count++;
             if (p.calculated_price_per_sqm) acc[portal].sqmPrices.push(p.calculated_price_per_sqm);
             if (p.discountPercentage !== undefined && p.discountPercentage < 0) {
-                 acc[portal].opportunities++;
-                 acc[portal].discounts.push(p.discountPercentage);
+                acc[portal].opportunities++;
+                acc[portal].discounts.push(p.discountPercentage);
             }
             return acc;
         }, {} as Record<string, { count: number; opportunities: number; sqmPrices: number[]; discounts: number[] }>);
@@ -250,4 +249,4 @@ export const MetricsView: React.FC<MetricsViewProps> = ({ properties }) => {
             </div>
         </div>
     );
-};
+});

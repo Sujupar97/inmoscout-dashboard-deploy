@@ -32,10 +32,10 @@ export const PropertyCard: React.FC<PropertyCardProps> = React.memo(({ property,
 
   return (
     <div
-      className={`bg-[var(--bg-secondary)] rounded-lg overflow-hidden border transition-all duration-300 transform hover:-translate-y-1 cursor-pointer flex flex-col ${isSelected ? 'border-green-500' : 'border-[var(--border-primary)] hover:border-[var(--primary-accent)]'}`}
+      className={`bg-[var(--bg-secondary)] rounded-lg border transition-all duration-300 transform hover:-translate-y-1 cursor-pointer flex flex-col ${isSelected ? 'border-green-500' : 'border-[var(--border-primary)] hover:border-[var(--primary-accent)]'}`}
       onClick={() => onSelectProperty(property)}
     >
-      <div className="relative">
+      <div className="relative overflow-hidden rounded-t-lg">
         <input
           type="checkbox"
           className="absolute top-3 right-3 h-5 w-5 rounded bg-black/30 border-white/50 text-[var(--primary-accent)] focus:ring-0 focus:offset-0 z-10"

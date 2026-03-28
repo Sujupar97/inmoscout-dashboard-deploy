@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Property, PropertyStatus } from '../types';
 import { ChartBarIcon } from './icons/ChartBarIcon';
 import { TagIcon } from './icons/TagIcon';
@@ -7,9 +7,11 @@ import { SparklesIcon } from './icons/SparklesIcon';
 import { EyeIcon } from './icons/EyeIcon';
 import { TimeSeriesChart } from './charts/TimeSeriesChart';
 import { FunnelChart } from './charts/FunnelChart';
+import { fetchMetricsSummary } from '../services/propertyService';
+import { MetricsSummary } from '../supabase';
 
 interface MetricsViewProps {
-    properties: Property[];
+    properties?: Property[];
 }
 
 // Sub-componentes
@@ -41,125 +43,89 @@ const DateRangeButton: React.FC<{
 );
 
 
-export const MetricsView: React.FC<MetricsViewProps> = React.memo(({ properties }) => {
-    const [dateRange, setDateRange] = useState(30); // Default to 30d
+export const MetricsView: React.FC<MetricsViewProps> = React.memo(() => {
+    const [dateRange, setDateRange] = useState(30);
+    const [serverData, setServerData] = useState<MetricsSummary | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const filteredProperties = useMemo(() => {
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        if (dateRange === 0) return properties; // 0 for "All time"
-
-        const cutoffDate = new Date(todayStart);
-        cutoffDate.setDate(todayStart.getDate() - (dateRange - 1));
-
-        return properties.filter(p => {
-            if (!p.created_at) return false;
-            const propDate = new Date(p.created_at);
-            return propDate >= cutoffDate;
-        });
-    }, [properties, dateRange]);
+    // Fetch metrics from server when dateRange changes
+    useEffect(() => {
+        setIsLoading(true);
+        fetchMetricsSummary(dateRange === 0 ? 3650 : dateRange)
+            .then(data => {
+                setServerData(data);
+                setIsLoading(false);
+            })
+            .catch(() => setIsLoading(false));
+    }, [dateRange]);
 
     const metrics = useMemo(() => {
-        const propertiesForStats = filteredProperties.filter(p => p.status !== PropertyStatus.Discarded);
+        if (!serverData) {
+            return {
+                totalProperties: 0, totalOpportunities: 0, totalStrongOpportunities: 0,
+                avgSqmPrice: 'N/A', avgDiscount: 'N/A',
+                timeSeriesData: [], funnelData: [], zonaAnalysisData: [], portalAnalysisData: [],
+            };
+        }
 
-        const opportunities = propertiesForStats.filter(p => p.discountPercentage !== undefined && p.discountPercentage < 0);
-        const strongOpportunities = opportunities.filter(p => p.discountPercentage !== undefined && p.discountPercentage <= -30);
+        const s = serverData.summary;
+        const timeSeriesData = (serverData.timeSeries || []).map(d => ({
+            date: new Date(d.date),
+            value: d.count,
+        }));
 
-        const validSqmProps = propertiesForStats.filter(p => p.calculated_price_per_sqm && p.calculated_price_per_sqm > 0);
-        const avgSqmPrice = validSqmProps.reduce((sum, p) => sum + p.calculated_price_per_sqm!, 0) / (validSqmProps.length || 1);
-
-        const avgDiscount = opportunities.reduce((sum, p) => sum + p.discountPercentage!, 0) / (opportunities.length || 1);
-
-        // For TimeSeriesChart - Counts all properties added in the period, regardless of status
-        const dateCounts = filteredProperties.reduce<Record<string, number>>((acc, p) => {
-            if (!p.created_at) return acc;
-            const date = new Date(p.created_at).toISOString().split('T')[0];
-            acc[date] = (acc[date] || 0) + 1;
-            return acc;
-        }, {});
-        const timeSeriesData = Object.entries(dateCounts)
-            .map(([date, value]) => ({ date: new Date(date), value }))
-            .sort((a, b) => a.date.getTime() - b.date.getTime());
-
-        // For FunnelChart - Based on non-discarded properties
         const funnelData = [
-            { label: 'Propiedades Analizadas', value: propertiesForStats.length },
-            { label: 'Oportunidades (Desc. > 0%)', value: opportunities.length },
-            { label: 'Oportunidades Clave (Desc. <= -30%)', value: strongOpportunities.length }
+            { label: 'Propiedades Analizadas', value: s.total_properties },
+            { label: 'Oportunidades (Desc. > 0%)', value: s.opportunities },
+            { label: 'Oportunidades Clave (Desc. <= -30%)', value: s.strong_opportunities },
         ];
 
-        // For Zona Table - Based on non-discarded properties
-        const zonaMetrics = propertiesForStats.reduce((acc, p) => {
-            if (!p.zona) return acc;
-            if (!acc[p.zona]) {
-                acc[p.zona] = { count: 0, sqmPrices: [], discounts: [] };
-            }
-            acc[p.zona].count++;
-            if (p.calculated_price_per_sqm) acc[p.zona].sqmPrices.push(p.calculated_price_per_sqm);
-            if (p.discountPercentage) acc[p.zona].discounts.push(p.discountPercentage);
-            return acc;
-        }, {} as Record<string, { count: number; sqmPrices: number[]; discounts: number[] }>);
-
-        const zonaAnalysisData = Object.entries(zonaMetrics)
-            .map(([zona, data]) => {
-                const typedData = data as { count: number; sqmPrices: number[]; discounts: number[] };
-                return {
-                    zona,
-                    count: typedData.count,
-                    avgSqmPrice: typedData.sqmPrices.length > 0 ? typedData.sqmPrices.reduce((a, b) => a + b, 0) / typedData.sqmPrices.length : 0,
-                    avgDiscount: typedData.discounts.length > 0 ? typedData.discounts.reduce((a, b) => a + b, 0) / typedData.discounts.length : 0,
-                };
-            })
+        const zonaAnalysisData = (serverData.byZone || [])
+            .map(z => ({
+                zona: z.zona,
+                count: z.count,
+                avgSqmPrice: z.avg_price_per_sqm || 0,
+                avgDiscount: z.avg_discount || 0,
+            }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 10);
 
-        // For Portal Table - Based on non-discarded properties
-        const portalMetrics = propertiesForStats.reduce((acc, p) => {
-            const portal = p.portal || 'Desconocido';
-            if (!acc[portal]) {
-                acc[portal] = { count: 0, opportunities: 0, sqmPrices: [], discounts: [] };
-            }
-            acc[portal].count++;
-            if (p.calculated_price_per_sqm) acc[portal].sqmPrices.push(p.calculated_price_per_sqm);
-            if (p.discountPercentage !== undefined && p.discountPercentage < 0) {
-                acc[portal].opportunities++;
-                acc[portal].discounts.push(p.discountPercentage);
-            }
-            return acc;
-        }, {} as Record<string, { count: number; opportunities: number; sqmPrices: number[]; discounts: number[] }>);
-
-        const portalAnalysisData = Object.entries(portalMetrics)
-            .map(([portal, data]) => {
-                const typedData = data as { count: number; opportunities: number; sqmPrices: number[]; discounts: number[] };
-                return {
-                    portal,
-                    count: typedData.count,
-                    opportunities: typedData.opportunities,
-                    avgSqmPrice: typedData.sqmPrices.length > 0 ? typedData.sqmPrices.reduce((a, b) => a + b, 0) / typedData.sqmPrices.length : 0,
-                    avgDiscount: typedData.discounts.length > 0 ? typedData.discounts.reduce((a, b) => a + b, 0) / typedData.discounts.length : 0,
-                };
-            })
-            .sort((a, b) => b.count - a.count);
-
+        const portalAnalysisData = (serverData.byPortal || []).map(p => ({
+            portal: p.portal,
+            count: p.count,
+            opportunities: 0,
+            avgSqmPrice: 0,
+            avgDiscount: 0,
+        }));
 
         return {
-            totalProperties: filteredProperties.length,
-            totalOpportunities: opportunities.length,
-            totalStrongOpportunities: strongOpportunities.length,
-            avgSqmPrice: avgSqmPrice > 0 ? `USD ${avgSqmPrice.toFixed(0)}` : 'N/A',
-            avgDiscount: opportunities.length > 0 ? `${avgDiscount.toFixed(1)}%` : 'N/A',
+            totalProperties: s.total_properties,
+            totalOpportunities: s.opportunities,
+            totalStrongOpportunities: s.strong_opportunities,
+            avgSqmPrice: s.avg_price_per_sqm > 0 ? `USD ${s.avg_price_per_sqm.toFixed(0)}` : 'N/A',
+            avgDiscount: s.opportunities > 0 ? `${s.avg_discount.toFixed(1)}%` : 'N/A',
             timeSeriesData,
             funnelData,
             zonaAnalysisData,
             portalAnalysisData,
         };
-    }, [filteredProperties]);
+    }, [serverData]);
+
+    if (isLoading && !serverData) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[var(--primary-accent)]" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
             <div className="bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-primary)] flex flex-col sm:flex-row items-center justify-between flex-wrap gap-4">
-                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Métricas para el Período</h3>
+                <div className="flex items-center space-x-3">
+                    <h3 className="text-lg font-semibold text-[var(--text-primary)]">Métricas para el Período</h3>
+                    {isLoading && <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[var(--primary-accent)]" />}
+                </div>
                 <div className="flex space-x-2 bg-[var(--bg-primary)] p-1 rounded-lg flex-wrap justify-center">
                     <DateRangeButton days={1} label="Hoy" currentDateRange={dateRange} setDateRange={setDateRange} />
                     <DateRangeButton days={7} label="7d" currentDateRange={dateRange} setDateRange={setDateRange} />

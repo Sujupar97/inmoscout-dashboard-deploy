@@ -7,10 +7,11 @@ import { GridIcon } from './icons/GridIcon';
 import { PropertyCard } from './PropertyCard';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { FilterIcon } from './icons/FilterIcon';
+import { SortConfig as ServiceSortConfig, FilterValues } from '../services/propertyService';
 
 interface DashboardProps {
   properties: Property[];
-  allProperties: Property[];
+  totalCount: number;
   onSelectProperty: (property: Property) => void;
   filters: Filters;
   onFilterChange: React.Dispatch<React.SetStateAction<Filters>>;
@@ -18,6 +19,13 @@ interface DashboardProps {
   onBulkUpdate: (propertyIds: string[], updates: Partial<Pick<Property, 'status' | 'is_potential_opportunity'>>) => void;
   initialFilters: Filters;
   activeView: View;
+  filterValues?: FilterValues;
+  page: number;
+  onPageChange: (page: number) => void;
+  pageSize: number;
+  totalPages: number;
+  sort: ServiceSortConfig;
+  onSortChange: (sort: ServiceSortConfig) => void;
 }
 
 type SortableKeys = 'price' | 'discountPercentage' | 'created_at' | 'zona' | 'portal' | 'total_calculated_sqm' | 'calculated_price_per_sqm' | 'days_on_market';
@@ -80,7 +88,7 @@ const SortableHeaderDiv: React.FC<{
   );
 };
 
-export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, allProperties, onSelectProperty, filters, onFilterChange, onUpdateStatus, onBulkUpdate, initialFilters, activeView }) => {
+export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, totalCount, onSelectProperty, filters, onFilterChange, onUpdateStatus, onBulkUpdate, initialFilters, activeView, filterValues, page, onPageChange, pageSize, totalPages, sort, onSortChange }) => {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
   const [sortConfigs, setSortConfigs] = useState<SortConfig[]>(defaultSortConfig);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
@@ -199,7 +207,7 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, all
   const gridRowVirtualizer = useVirtualizer({
     count: gridRowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 380, // Approx height of a card + gap
+    estimateSize: () => 480, // Card height: img(192)+padding(32)+status(28)+title(28)+seller(20)+data(72)+button(52)+gap(24)=448 + margin
     overscan: 2,
   });
 
@@ -233,9 +241,9 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, all
         onClose={() => setIsFiltersOpen(false)}
         filters={filters}
         onFilterChange={onFilterChange}
-        properties={allProperties}
         initialFilters={initialFilters}
         activeView={activeView}
+        filterValues={filterValues}
       />
 
       {selectedIds.size > 0 && (
@@ -263,7 +271,7 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, all
 
       <div className="flex justify-between items-center flex-shrink-0 mb-6">
         <div className="flex items-center space-x-4">
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">{`${properties.length} ${properties.length === 1 ? 'Propiedad Encontrada' : 'Propiedades Encontradas'}`}</h2>
+          <h2 className="text-xl font-semibold text-[var(--text-primary)]">{`${totalCount.toLocaleString('es-AR')} ${totalCount === 1 ? 'Propiedad Encontrada' : 'Propiedades Encontradas'}`}</h2>
           {isCustomSortActive && (
             <button onClick={() => setSortConfigs(defaultSortConfig)} className="text-xs bg-gray-700 text-gray-300 px-3 py-1 rounded-full hover:bg-gray-600">
               Restablecer Orden
@@ -392,6 +400,48 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, all
           </div>
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex-shrink-0 flex items-center justify-between mt-4 px-2">
+          <p className="text-sm text-[var(--text-secondary)]">
+            Mostrando {page * pageSize + 1}-{Math.min((page + 1) * pageSize, totalCount)} de {totalCount.toLocaleString('es-AR')}
+          </p>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => onPageChange(0)}
+              disabled={page === 0}
+              className="px-3 py-1.5 text-sm rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ««
+            </button>
+            <button
+              onClick={() => onPageChange(page - 1)}
+              disabled={page === 0}
+              className="px-3 py-1.5 text-sm rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              « Anterior
+            </button>
+            <span className="px-3 py-1.5 text-sm text-[var(--text-primary)] font-medium">
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => onPageChange(page + 1)}
+              disabled={page >= totalPages - 1}
+              className="px-3 py-1.5 text-sm rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Siguiente »
+            </button>
+            <button
+              onClick={() => onPageChange(totalPages - 1)}
+              disabled={page >= totalPages - 1}
+              className="px-3 py-1.5 text-sm rounded-md bg-[var(--bg-secondary)] border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              »»
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

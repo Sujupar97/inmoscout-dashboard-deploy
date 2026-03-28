@@ -4,15 +4,17 @@ import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { propertyStatusTranslations } from '../utils/translations';
 import { FilterIcon } from './icons/FilterIcon';
 import { PORTAL_NAMES } from '../utils/translations';
+import { FilterValues } from '../services/propertyService';
 
 interface AdvancedFilterPanelProps {
   filters: Filters;
   onFilterChange: React.Dispatch<React.SetStateAction<Filters>>;
-  properties: Property[];
+  properties?: Property[];
   initialFilters: Filters;
   activeView: View;
   isOpen: boolean;
   onClose: () => void;
+  filterValues?: FilterValues;
 }
 
 const statusOptions = ['All', ...Object.values(PropertyStatus)];
@@ -36,9 +38,13 @@ export const AdvancedFilterPanel: React.FC<AdvancedFilterPanelProps> = ({
   activeView,
   isOpen,
   onClose,
+  filterValues,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const portalOptions = useMemo(() => ['All', ...PORTAL_NAMES], []);
+  const portalOptions = useMemo(() => {
+    if (filterValues?.portals?.length) return ['All', ...filterValues.portals];
+    return ['All', ...PORTAL_NAMES];
+  }, [filterValues]);
   const isOpportunitiesView = activeView === 'opportunities';
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -67,7 +73,7 @@ export const AdvancedFilterPanel: React.FC<AdvancedFilterPanelProps> = ({
       onFilterChange(prev => ({...prev, minDiscount: ''}));
       return;
     }
-    
+
     const maxDiscount = isOpportunitiesView ? -30 : 0;
     if (value > maxDiscount) value = maxDiscount;
     if (value < -100) value = -100;
@@ -77,12 +83,16 @@ export const AdvancedFilterPanel: React.FC<AdvancedFilterPanelProps> = ({
   };
 
   const uniqueZonas = useMemo(() => {
-    return ['All', ...[...new Set(properties.map(p => p.zona).filter(Boolean) as string[])].sort()];
-  }, [properties]);
+    if (filterValues?.zonas?.length) return ['All', ...filterValues.zonas];
+    if (properties?.length) return ['All', ...[...new Set(properties.map(p => p.zona).filter(Boolean) as string[])].sort()];
+    return ['All'];
+  }, [filterValues, properties]);
 
   const uniquePropertyTypes = useMemo(() => {
-    return ['All', ...[...new Set(properties.map(p => p.propertyType).filter(Boolean) as string[])].sort()];
-  }, [properties]);
+    if (filterValues?.propertyTypes?.length) return ['All', ...filterValues.propertyTypes];
+    if (properties?.length) return ['All', ...[...new Set(properties.map(p => p.propertyType).filter(Boolean) as string[])].sort()];
+    return ['All'];
+  }, [filterValues, properties]);
   
   const discountSliderMax = isOpportunitiesView ? -30 : 0;
   const discountValueForSlider = filters.minDiscount ? parseInt(filters.minDiscount, 10) : discountSliderMax;

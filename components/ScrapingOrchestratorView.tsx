@@ -27,7 +27,7 @@ interface SchedulerConfig {
 }
 
 interface ScrapingOrchestratorViewProps {
-    SCRAPER_CONFIG: { name: string; webhook: string }[];
+    SCRAPER_CONFIG: { name: string; webhook?: string }[];
     TARGET_ZONES: string[];
 
     // Zonaprop Props
@@ -273,33 +273,18 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
         e.preventDefault();
         setIsManualLoading(true);
         setManualFeedback(null);
-        if (!manualWebhook) {
-            setManualFeedback({ type: 'error', message: 'El Webhook es obligatorio.' });
-            setIsManualLoading(false);
-            return;
-        }
-        const url = buildScraperUrl(manualPortal, manualZone, manualType);
         try {
-            const payload = {
-                zona: manualZone,
-                property_type: manualType,
-                portal: manualPortal,
-                pages: 5, // Deep scrape
-                url: url,
-                jobId: `manual-${manualPortal}-${manualZone}-${manualType}-${Date.now()}`,
-            };
-
-            const response = await fetch(manualWebhook, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+            if (!supabase) throw new Error('Supabase not configured');
+            const { data, error } = await supabase.functions.invoke('scrape-orchestrator', {
+                body: {
+                    portal: manualPortal,
+                    zona: manualZone,
+                    property_type: manualType,
+                    pages: 5,
+                },
             });
-
-            if (!response.ok) {
-                throw new Error(`La solicitud al webhook falló con el estado ${response.status}`);
-            }
-
-            setManualFeedback({ type: 'success', message: 'Prueba de scraping iniciada exitosamente.' });
+            if (error) throw error;
+            setManualFeedback({ type: 'success', message: `Scraping iniciado: run #${data?.run_id}, ${data?.tasks_created} tareas creadas.` });
         } catch (error: any) {
             setManualFeedback({ type: 'error', message: `Error: ${error.message}` });
         } finally {
@@ -307,89 +292,64 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
         }
     };
 
-    const handleTriggerPortal = (portalName: string) => {
-        const message = portalName === 'Zonaprop'
-            ? `¿Estás seguro de que quieres disparar el scraping general para ${portalName}?`
-            : `¿Estás seguro de que quieres disparar todos los jobs para ${portalName}? Se pondrán en la cola y se iniciará el orquestador si está pausado.`;
-
-        if (!window.confirm(message)) {
+    const handleTriggerPortal = async (portalName: string) => {
+        if (!window.confirm(`¿Estás seguro de que quieres disparar el scraping para ${portalName}?`)) {
             return;
         }
+        if (!supabase) return;
 
-        if (portalName === 'Zonaprop') {
-            const zonapropWebhook = 'https://n8n.srv1022992.hstgr.cloud/webhook/750e883c-85ce-4995-8537-161dd63e3890';
-            setManualFeedback({ type: 'success', message: `Iniciando scraping general para Zonaprop...` });
+        setManualFeedback({ type: 'success', message: `Iniciando scraping para ${portalName}...` });
 
-            fetch(zonapropWebhook, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ trigger: 'general-zonaprop-scrape' })
-            }).then(response => {
-                if (!response.ok) {
-                    throw new Error(`El envío del Webhook falló con el estado ${response.status}`);
-                }
-                setManualFeedback({ type: 'success', message: 'Scraping para Zonaprop iniciado correctamente.' });
-                // Set jobs to pending so user sees activity
-                setJobs(prevJobs => prevJobs.map(job => {
-                    if (job.portal === portalName && job.status !== ScrapingJobStatus.Paused) {
-                        return { ...job, status: ScrapingJobStatus.Pending, errorMessage: undefined };
-                    }
-                    return job;
-                }));
-            }).catch((error: any) => {
-                setManualFeedback({ type: 'error', message: `Error al iniciar scraping para Zonaprop: ${error.message}` });
-            });
-        } else {
-            // For other portals, queue jobs and ensure orchestrator is running
-            setJobs(prevJobs => prevJobs.map(job => {
-                if (job.portal === portalName && job.status !== ScrapingJobStatus.Paused && job.status !== ScrapingJobStatus.Running) {
-                    return { ...job, status: ScrapingJobStatus.Pending, errorMessage: undefined };
-                }
-                return job;
-            }));
-            if (isOrchestratorPaused) {
-                setIsOrchestratorPaused(false);
+        // Set all pending jobs for this portal
+        setJobs(prevJobs => prevJobs.map(job => {
+            if (job.portal === portalName && job.status !== ScrapingJobStatus.Paused) {
+                return { ...job, status: ScrapingJobStatus.Pending, errorMessage: undefined };
             }
-            setManualFeedback({ type: 'success', message: `Orquestador activado para procesar los trabajos de ${portalName}.` });
+            return job;
+        }));
+
+        // Trigger scrape-orchestrator Edge Function for each zona+type
+        try {
+            for (const zona of TARGET_ZONES) {
+                for (const type of PROPERTY_TYPES) {
+                    await supabase.functions.invoke('scrape-orchestrator', {
+                        body: { portal: portalName, zona, property_type: type, pages: 5 },
+                    });
+                }
+            }
+            setManualFeedback({ type: 'success', message: `Scraping para ${portalName} iniciado correctamente. Las tareas se procesan automáticamente.` });
+        } catch (error: any) {
+            setManualFeedback({ type: 'error', message: `Error al iniciar scraping para ${portalName}: ${error.message}` });
+        }
+
+        if (isOrchestratorPaused) {
+            setIsOrchestratorPaused(false);
         }
     };
 
     const dispatchJob = useCallback(async (job: ScrapingJob) => {
-        const portalConfig = SCRAPER_CONFIG.find(s => s.name === job.portal);
-        const webhook = portalConfig?.webhook;
-
-        if (!webhook) {
-            setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: ScrapingJobStatus.Failed, errorMessage: `No se encontró webhook para ${job.portal}.` } : j));
+        if (!supabase) {
+            setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: ScrapingJobStatus.Failed, errorMessage: 'Supabase not configured' } : j));
             return;
         }
 
         setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: ScrapingJobStatus.Running, lastRun: Date.now(), duration: 0, errorMessage: undefined } : j));
         setLastRunTimestamps(prev => new Map(prev).set(job.id, Date.now()));
-        const url = buildScraperUrl(job.portal, job.zona, job.propertyType);
         try {
-            const payload = {
-                zona: job.zona,
-                property_type: job.propertyType,
-                portal: job.portal,
-                pages: 5, // Deep scrape for orchestrator
-                url: url,
-                jobId: job.id,
-            };
-
-            const response = await fetch(webhook, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+            const { error } = await supabase.functions.invoke('scrape-orchestrator', {
+                body: {
+                    portal: job.portal,
+                    zona: job.zona,
+                    property_type: job.propertyType,
+                    pages: 5,
+                },
             });
-
-            if (!response.ok) {
-                throw new Error(`El envío del Webhook falló con el estado ${response.status}`);
-            }
+            if (error) throw error;
         } catch (error: any) {
             console.error(`Error en job ${job.id}:`, error);
             setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: ScrapingJobStatus.Failed, errorMessage: error.message } : j));
         }
-    }, [SCRAPER_CONFIG]);
+    }, []);
 
     const handleManualJobTrigger = (jobId: string) => {
         const jobToRun = jobs.find(j => j.id === jobId);

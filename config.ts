@@ -1,19 +1,14 @@
 // This file contains configuration variables for the application.
 
-// Configuration for the automated scraping orchestrator.
+// Supabase Edge Functions base URL for the scraping system.
+// All scraping is handled internally via Edge Functions (no external n8n).
+export const EDGE_FUNCTION_BASE_URL = 'https://lwcsouyknwbxeexektyr.supabase.co/functions/v1';
+
+// Portal configurations for the scraping orchestrator.
 export const SCRAPER_CONFIG = [
-  {
-    name: 'Zonaprop',
-    webhook: 'https://n8n.srv1022992.hstgr.cloud/webhook/750e883c-85ce-4995-8537-161dd63e3890'
-  },
-  {
-    name: 'Argenprop',
-    webhook: 'https://n8n.srv1022992.hstgr.cloud/webhook/5125f692-bbc2-452c-bc30-176df6f5c4c8'
-  },
-  {
-    name: 'MercadoLibre',
-    webhook: 'https://n8n.srv1022992.hstgr.cloud/webhook/750e883c-85ce-4995-8537-161dd63e3890'
-  }
+  { name: 'Zonaprop' },
+  { name: 'Argenprop' },
+  { name: 'MercadoLibre' },
 ];
 
 // List of property types to be scraped by the orchestrator.

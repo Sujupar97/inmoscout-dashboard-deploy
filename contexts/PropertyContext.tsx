@@ -35,7 +35,7 @@ const initialFilters: Filters = {
   searchUrl: '',
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 interface PropertyContextType {
   // Data
@@ -143,10 +143,10 @@ export const PropertyProvider: React.FC<{ children: React.ReactNode; isAuthentic
       });
   }, [isAuthenticated, debouncedFilters, activeView, sort, page]);
 
-  // Reset page to 0 when filters change
+  // Reset page to 0 when filters or sort change
   useEffect(() => {
     setPage(0);
-  }, [debouncedFilters, activeView]);
+  }, [debouncedFilters, activeView, sort]);
 
   const handleUpdateStatus = useCallback(async (propertyId: string, status: PropertyStatus) => {
     try {

@@ -26,6 +26,7 @@ interface DashboardProps {
   totalPages: number;
   sort: ServiceSortConfig;
   onSortChange: (sort: ServiceSortConfig) => void;
+  isLoading?: boolean;
 }
 
 type SortableKeys = 'price' | 'discountPercentage' | 'created_at' | 'zona' | 'portal' | 'total_calculated_sqm' | 'calculated_price_per_sqm' | 'days_on_market';
@@ -88,12 +89,12 @@ const SortableHeaderDiv: React.FC<{
   );
 };
 
-export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, totalCount, onSelectProperty, filters, onFilterChange, onUpdateStatus, onBulkUpdate, initialFilters, activeView, filterValues, page, onPageChange, pageSize, totalPages, sort, onSortChange }) => {
+export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, totalCount, onSelectProperty, filters, onFilterChange, onUpdateStatus, onBulkUpdate, initialFilters, activeView, filterValues, page, onPageChange, pageSize, totalPages, sort, onSortChange, isLoading }) => {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
-  const [sortConfigs, setSortConfigs] = useState<SortConfig[]>(defaultSortConfig);
+  const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([sort]);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const isCustomSortActive = JSON.stringify(sortConfigs) !== JSON.stringify(defaultSortConfig);
+  const isCustomSortActive = sort.key !== 'created_at' || sort.direction !== 'desc';
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Clear selection when filters change (properties list changes)
@@ -101,62 +102,21 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, tot
     setSelectedIds(new Set());
   }, [properties]);
 
+  // Server-side sorting: clicking a column header sends the sort to the server
   const requestSort = (key: SortableKeys, event: React.MouseEvent) => {
-    const isShiftClick = event.shiftKey;
+    const newDirection: 'asc' | 'desc' =
+      (sortConfigs.length === 1 && sortConfigs[0].key === key)
+        ? (sortConfigs[0].direction === 'asc' ? 'desc' : 'asc')
+        : 'desc';
 
-    setSortConfigs(prevConfigs => {
-      const existingConfigIndex = prevConfigs.findIndex(c => c.key === key);
-
-      if (!isShiftClick) {
-        // Clic normal: establece como ordenamiento principal
-        if (existingConfigIndex === 0 && prevConfigs.length === 1) {
-          // Si es el único ordenamiento, cambia la dirección
-          return [{ key, direction: prevConfigs[0].direction === 'asc' ? 'desc' : 'asc' }];
-        } else {
-          // Establece un nuevo ordenamiento principal
-          return [{ key, direction: 'desc' }];
-        }
-      } else {
-        // Shift + Clic: añade o modifica un ordenamiento secundario
-        if (existingConfigIndex > -1) {
-          // Si ya existe, cambia su dirección
-          const newConfigs = [...prevConfigs];
-          newConfigs[existingConfigIndex].direction = newConfigs[existingConfigIndex].direction === 'asc' ? 'desc' : 'asc';
-          return newConfigs;
-        } else {
-          // Si no existe, añádelo
-          return [...prevConfigs, { key, direction: 'desc' }];
-        }
-      }
-    });
+    const newSort = { key, direction: newDirection };
+    setSortConfigs([newSort]);
+    // Send sort to server via context — this triggers a new fetch with correct ordering across ALL properties
+    onSortChange(newSort);
   };
 
-
-  const sortedProperties = useMemo(() => {
-    let sortableItems = [...properties];
-    sortableItems.sort((a, b) => {
-      for (const config of sortConfigs) {
-        const valA = a[config.key];
-        const valB = b[config.key];
-
-        if (valA === null || valA === undefined) return 1;
-        if (valB === null || valB === undefined) return -1;
-
-        let comparison = 0;
-        if (valA < valB) {
-          comparison = -1;
-        } else if (valA > valB) {
-          comparison = 1;
-        }
-
-        if (comparison !== 0) {
-          return config.direction === 'asc' ? comparison : -comparison;
-        }
-      }
-      return 0;
-    });
-    return sortableItems;
-  }, [properties, sortConfigs]);
+  // Properties come pre-sorted from the server, no client-side sorting needed
+  const sortedProperties = properties;
 
   const handleToggleSelection = useCallback((propertyId: string) => {
     setSelectedIds(prev => {
@@ -273,9 +233,12 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, tot
         <div className="flex items-center space-x-4">
           <h2 className="text-xl font-semibold text-[var(--text-primary)]">{`${totalCount.toLocaleString('es-AR')} ${totalCount === 1 ? 'Propiedad Encontrada' : 'Propiedades Encontradas'}`}</h2>
           {isCustomSortActive && (
-            <button onClick={() => setSortConfigs(defaultSortConfig)} className="text-xs bg-gray-700 text-gray-300 px-3 py-1 rounded-full hover:bg-gray-600">
+            <button onClick={() => { setSortConfigs(defaultSortConfig); onSortChange({ key: 'created_at', direction: 'desc' }); }} className="text-xs bg-gray-700 text-gray-300 px-3 py-1 rounded-full hover:bg-gray-600">
               Restablecer Orden
             </button>
+          )}
+          {isLoading && (
+            <span className="text-xs text-[var(--primary-accent)] animate-pulse">Cargando...</span>
           )}
         </div>
 

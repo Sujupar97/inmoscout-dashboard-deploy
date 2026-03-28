@@ -23,6 +23,17 @@ export interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
+// Map frontend sort keys to RPC sort keys
+const SORT_KEY_TO_RPC: Record<string, string> = {
+  created_at: 'created_at',
+  price: 'precio',
+  total_calculated_sqm: 'area',
+  calculated_price_per_sqm: 'price_per_sqm',
+  days_on_market: 'days',
+  discountPercentage: 'discount',
+  zona: 'zona',
+};
+
 /**
  * Fetches properties with all filtering, sorting, and calculation done server-side.
  * This replaces the old pattern of fetchProperties() + client-side useMemo filtering.
@@ -43,7 +54,7 @@ export const fetchFilteredProperties = async (
       ? activeView : 'inventory',
     p_limit: pageSize,
     p_offset: page * pageSize,
-    p_sort_key: sort.key,
+    p_sort_key: SORT_KEY_TO_RPC[sort.key] || sort.key,
     p_sort_dir: sort.direction,
   };
 

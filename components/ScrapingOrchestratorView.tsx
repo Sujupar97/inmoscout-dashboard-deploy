@@ -17,6 +17,132 @@ import { CheckCircleIcon } from './icons/CheckCircleIcon';
 
 const JOB_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 hours
 const JOB_COOLDOWN_MS = 1 * 60 * 1000; // 1 minute cooldown to prevent spamming
+const PROGRESS_POLL_MS = 5_000; // Poll progress every 5 seconds
+
+interface PortalProgress {
+    portal: string;
+    total: number;
+    completed: number;
+    failed: number;
+    pending: number;
+    processing: number;
+    properties_new: number;
+    properties_skipped: number;
+}
+
+interface GlobalProgress {
+    byPortal: PortalProgress[];
+    totalToday: {
+        total: number;
+        completed: number;
+        pending: number;
+        processing: number;
+        failed: number;
+        skipped: number;
+    };
+}
+
+const ScrapingProgressPanel: React.FC<{ progress: GlobalProgress }> = ({ progress }) => {
+    const { byPortal, totalToday } = progress;
+    const isActive = totalToday.pending > 0 || totalToday.processing > 0;
+    const totalDone = totalToday.completed + totalToday.failed + totalToday.skipped;
+    const pct = totalToday.total > 0 ? Math.round((totalDone / totalToday.total) * 100) : 0;
+    const totalNewProps = byPortal.reduce((s, p) => s + p.properties_new, 0);
+    const totalSkipped = byPortal.reduce((s, p) => s + p.properties_skipped, 0);
+
+    if (totalToday.total === 0) return null;
+
+    return (
+        <div className={`bg-[var(--bg-secondary)] p-4 sm:p-6 rounded-lg border ${isActive ? 'border-green-500/50' : 'border-[var(--border-primary)]'}`}>
+            <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-bold text-[var(--text-primary)]">
+                        {isActive ? 'Scraping en Progreso' : 'Scraping Completado'}
+                    </h2>
+                    {isActive && <span className="h-3 w-3 bg-green-500 rounded-full animate-pulse" />}
+                </div>
+                <span className="text-sm text-[var(--text-secondary)]">
+                    {totalDone} / {totalToday.total} tareas ({pct}%)
+                </span>
+            </div>
+
+            {/* Global progress bar */}
+            <div className="w-full bg-[var(--bg-tertiary)] rounded-full h-3 mb-5 overflow-hidden">
+                <div
+                    className="h-3 rounded-full transition-all duration-700 ease-out"
+                    style={{
+                        width: `${pct}%`,
+                        background: isActive
+                            ? 'linear-gradient(90deg, #10b981, #34d399)'
+                            : '#10b981',
+                    }}
+                />
+            </div>
+
+            {/* Per-portal breakdown */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                {['Zonaprop', 'MercadoLibre', 'Argenprop'].map(portalName => {
+                    const p = byPortal.find(bp => bp.portal === portalName);
+                    if (!p) return (
+                        <div key={portalName} className="bg-[var(--bg-primary)] p-3 rounded-lg">
+                            <p className="text-sm font-semibold text-[var(--text-secondary)]">{portalName}</p>
+                            <p className="text-xs text-[var(--text-tertiary)] mt-1">Sin tareas hoy</p>
+                        </div>
+                    );
+                    const portalDone = p.completed + p.failed + p.properties_skipped;
+                    const portalPct = p.total > 0 ? Math.round((portalDone / p.total) * 100) : 0;
+                    return (
+                        <div key={portalName} className="bg-[var(--bg-primary)] p-3 rounded-lg">
+                            <div className="flex justify-between items-center mb-2">
+                                <p className="text-sm font-semibold text-[var(--text-primary)]">{portalName}</p>
+                                <span className="text-xs text-[var(--text-secondary)]">{portalPct}%</span>
+                            </div>
+                            <div className="w-full bg-[var(--bg-tertiary)] rounded-full h-2 mb-2">
+                                <div
+                                    className="h-2 rounded-full bg-green-500 transition-all duration-500"
+                                    style={{ width: `${portalPct}%` }}
+                                />
+                            </div>
+                            <div className="flex justify-between text-xs text-[var(--text-secondary)]">
+                                <span>{p.properties_new} nuevas</span>
+                                <span>{p.pending + p.processing} pendientes</span>
+                                {p.failed > 0 && <span className="text-red-400">{p.failed} errores</span>}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Summary stats */}
+            <div className="flex flex-wrap gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                    <span className="text-[var(--text-secondary)]">Propiedades nuevas:</span>
+                    <span className="font-bold text-green-400">{totalNewProps}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-yellow-500" />
+                    <span className="text-[var(--text-secondary)]">Omitidas (duplicadas):</span>
+                    <span className="font-bold text-yellow-400">{totalSkipped}</span>
+                </div>
+                {totalToday.failed > 0 && (
+                    <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-red-500" />
+                        <span className="text-[var(--text-secondary)]">Errores:</span>
+                        <span className="font-bold text-red-400">{totalToday.failed}</span>
+                    </div>
+                )}
+                {isActive && (
+                    <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                        <span className="text-[var(--text-secondary)]">Procesando:</span>
+                        <span className="font-bold text-blue-400">{totalToday.processing}</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 interface SchedulerConfig {
     portal: string;
@@ -106,6 +232,25 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
     const [isManualLoading, setIsManualLoading] = useState(false);
     const [manualFeedback, setManualFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
+    // --- Global Scraping Progress ---
+    const [globalProgress, setGlobalProgress] = useState<GlobalProgress | null>(null);
+
+    useEffect(() => {
+        if (!supabase) return;
+        let cancelled = false;
+
+        const fetchProgress = async () => {
+            const { data, error } = await supabase.rpc('get_global_scraper_progress');
+            if (!cancelled && !error && data) {
+                setGlobalProgress(data as unknown as GlobalProgress);
+            }
+        };
+
+        fetchProgress(); // Initial fetch
+        const interval = setInterval(fetchProgress, PROGRESS_POLL_MS);
+        return () => { cancelled = true; clearInterval(interval); };
+    }, []);
+
     // --- Scheduler Config State ---
     const [schedulerConfigs, setSchedulerConfigs] = useState<SchedulerConfig[]>([]);
     const [isSchedulerLoading, setIsSchedulerLoading] = useState(true);
@@ -155,12 +300,25 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
         if (!window.confirm("¿Ejecutar el sistema automatizado ahora? Esto disparará los scrapers activos inmediatamente.")) return;
 
         try {
-            const { data, error } = await supabase.functions.invoke('trigger-scrapers', {
-                body: { manualTrigger: true }
-            });
+            const activePortals = schedulerConfigs.filter(c => c.is_active);
+            if (activePortals.length === 0) {
+                alert('No hay portales activos. Activa al menos un portal primero.');
+                return;
+            }
 
-            if (error) throw error;
-            alert(`Ejecución iniciada: ${JSON.stringify(data)}`);
+            let totalTasks = 0;
+            for (const config of activePortals) {
+                for (const zona of TARGET_ZONES) {
+                    for (const type of PROPERTY_TYPES) {
+                        const { data, error } = await supabase.functions.invoke('scrape-orchestrator', {
+                            body: { portal: config.portal, zona, property_type: type, pages: 5 },
+                        });
+                        if (!error && data?.tasks_created) totalTasks += data.tasks_created;
+                    }
+                }
+            }
+
+            alert(`Ejecución iniciada: ${totalTasks} tareas creadas para ${activePortals.map(p => p.portal).join(', ')}`);
         } catch (e: any) {
             alert(`Error al ejecutar: ${e.message}`);
         }
@@ -571,6 +729,9 @@ export const ScrapingOrchestratorView: React.FC<ScrapingOrchestratorViewProps> =
                     </div>
                 )}
             </div>
+
+            {/* Real-time Scraping Progress Panel */}
+            {globalProgress && <ScrapingProgressPanel progress={globalProgress} />}
 
             <div className="bg-[var(--bg-secondary)] p-4 sm:p-6 rounded-lg border border-[var(--border-primary)]">
                 <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Estado de Ejecuciones Diarias</h2>

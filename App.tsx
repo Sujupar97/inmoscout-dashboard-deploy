@@ -75,6 +75,7 @@ const AppContent: React.FC = () => {
             totalPages={totalPages}
             sort={sort}
             onSortChange={setSort}
+            isLoading={isPropertiesLoading}
           />
         );
       case 'metrics':

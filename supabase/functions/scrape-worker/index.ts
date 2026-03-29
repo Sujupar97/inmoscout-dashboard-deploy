@@ -55,8 +55,13 @@ Deno.serve(async (req) => {
         tasksProcessed++
       } catch (e) {
         errors++
-        console.error(`Error processing task ${(task as QueueTask).id}:`, e)
-        await handleTaskError(supabase, task as QueueTask, (e as Error).message)
+        const errMsg = e instanceof Error ? e.message : JSON.stringify(e)
+        console.error(`[WORKER ERROR] Task #${(task as QueueTask).id} (${(task as QueueTask).portal}/${(task as QueueTask).zona}): ${errMsg}`)
+        try {
+          await handleTaskError(supabase, task as QueueTask, errMsg)
+        } catch (he) {
+          console.error(`[WORKER ERROR] Failed to handle error for task #${(task as QueueTask).id}:`, he)
+        }
       }
 
       // Rate limit: wait between ScraperAPI calls
@@ -219,7 +224,7 @@ async function processPropertyPage(supabase: ReturnType<typeof getSupabaseClient
       longitude: propertyData.longitude,
       'Tipo de Propiedad': task.property_type,
       Portal: PORTAL_IDS[task.portal] || 1,
-      status: 'New',
+      // status uses DEFAULT 'New'::property_status from the column definition
       nombre_anunciante: propertyData.nombre_anunciante,
       telefono_contacto: propertyData.telefono_contacto,
       antiguedad: propertyData.antiguedad,

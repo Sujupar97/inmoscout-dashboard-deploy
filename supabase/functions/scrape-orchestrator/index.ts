@@ -156,6 +156,17 @@ async function createScrapingRun(
 ): Promise<{ run_id: number; tasks_created: number }> {
   const jobId = `${portal}-${zona}-${propertyType}`
 
+  // 0. Dedup: skip if there are already pending/processing tasks for this combo
+  const { count: existingPending } = await supabase
+    .from('scraper_queue')
+    .select('*', { count: 'exact', head: true })
+    .eq('job_id', jobId)
+    .in('status', ['pending', 'processing'])
+
+  if (existingPending && existingPending > 0) {
+    return { run_id: 0, tasks_created: 0 }
+  }
+
   // 1. Create run log entry
   const { data: runLog, error: runError } = await supabase
     .from('scraper_run_log')
@@ -188,8 +199,8 @@ async function createScrapingRun(
       target_url: pageUrl,
       page_number: page,
       status: 'pending',
-      // Stagger pages: 0s, 15s, 30s, 45s...
-      not_before: new Date(Date.now() + (page - 1) * 15000).toISOString(),
+      // Stagger pages: 0s, 5s, 10s, 15s...
+      not_before: new Date(Date.now() + (page - 1) * 5000).toISOString(),
     })
   }
 

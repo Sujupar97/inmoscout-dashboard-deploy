@@ -15,7 +15,7 @@ import { parseListingPage, parsePropertyPage } from '../_shared/parsers/index.ts
 import { QueueTask, PORTAL_IDS } from '../_shared/types.ts'
 
 const MAX_RUNTIME_MS = 120_000  // 120s safety margin (Edge Function timeout is 150s)
-const DELAY_BETWEEN_TASKS_MS = 5_000  // Rate limit: 5s between ScraperAPI calls
+const DELAY_BETWEEN_TASKS_MS = 2_000  // Rate limit: 2s between ScraperAPI calls (ScraperAPI allows 20 concurrent)
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -128,9 +128,23 @@ async function processListingPage(supabase: ReturnType<typeof getSupabaseClient>
     newUrls = result.urls.filter(url => !existingLinks.has(url))
   }
 
-  // 4. Create property scraping tasks for new URLs
+  // 4. Dedup against existing tasks in queue (prevent duplicate property tasks)
+  let urlsToQueue = newUrls
   if (newUrls.length > 0) {
-    const propertyTasks = newUrls.map((url, i) => ({
+    const { data: existingTasks } = await supabase
+      .from('scraper_queue')
+      .select('target_url')
+      .in('target_url', newUrls)
+
+    if (existingTasks && existingTasks.length > 0) {
+      const existingTaskUrls = new Set(existingTasks.map((t: any) => t.target_url))
+      urlsToQueue = newUrls.filter(url => !existingTaskUrls.has(url))
+    }
+  }
+
+  // 5. Create property scraping tasks for truly new URLs
+  if (urlsToQueue.length > 0) {
+    const propertyTasks = urlsToQueue.map((url, i) => ({
       job_id: task.job_id,
       run_id: task.run_id,
       task_type: 'scrape_property' as const,
@@ -139,15 +153,14 @@ async function processListingPage(supabase: ReturnType<typeof getSupabaseClient>
       property_type: task.property_type,
       target_url: url,
       status: 'pending' as const,
-      // Stagger: 10s apart to respect rate limits
-      not_before: new Date(Date.now() + (i + 1) * 10_000).toISOString(),
+      // Stagger: 2s apart (ScraperAPI allows 20 concurrent)
+      not_before: new Date(Date.now() + (i + 1) * 2_000).toISOString(),
     }))
 
     await supabase.from('scraper_queue').insert(propertyTasks)
   }
 
-  // 5. Also create 'skipped' entries for existing URLs (for tracking)
-  const skippedCount = result.urls.length - newUrls.length
+  const skippedCount = result.urls.length - urlsToQueue.length
 
   // 6. Mark task as completed
   await supabase
@@ -156,7 +169,7 @@ async function processListingPage(supabase: ReturnType<typeof getSupabaseClient>
       status: 'completed',
       result_data: {
         urls_found: result.urls.length,
-        new_urls: newUrls.length,
+        new_urls: urlsToQueue.length,
         skipped_urls: skippedCount,
         has_next_page: result.hasNextPage,
       },

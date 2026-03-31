@@ -35,6 +35,7 @@ Deno.serve(async (req) => {
   const supabase = getSupabaseClient()
   let tasksProcessed = 0
   let errors = 0
+  const errorDetails: string[] = []
 
   try {
     while (Date.now() - startTime < MAX_RUNTIME_MS) {
@@ -43,7 +44,7 @@ Deno.serve(async (req) => {
         .rpc('claim_next_scraper_task')
 
       if (claimError) {
-        console.error('Error claiming task:', claimError)
+        errorDetails.push(`Claim error: ${claimError.message}`)
         break
       }
 
@@ -56,11 +57,11 @@ Deno.serve(async (req) => {
       } catch (e) {
         errors++
         const errMsg = e instanceof Error ? e.message : JSON.stringify(e)
-        console.error(`[WORKER ERROR] Task #${(task as QueueTask).id} (${(task as QueueTask).portal}/${(task as QueueTask).zona}): ${errMsg}`)
+        errorDetails.push(`Task #${(task as QueueTask).id} (${(task as QueueTask).task_type} ${(task as QueueTask).portal}/${(task as QueueTask).zona}): ${errMsg}`)
         try {
           await handleTaskError(supabase, task as QueueTask, errMsg)
         } catch (he) {
-          console.error(`[WORKER ERROR] Failed to handle error for task #${(task as QueueTask).id}:`, he)
+          errorDetails.push(`HandleError failed for #${(task as QueueTask).id}: ${he instanceof Error ? he.message : String(he)}`)
         }
       }
 
@@ -78,6 +79,7 @@ Deno.serve(async (req) => {
         success: true,
         tasks_processed: tasksProcessed,
         errors,
+        error_details: errorDetails,
         runtime_ms: Date.now() - startTime,
       }),
       { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }

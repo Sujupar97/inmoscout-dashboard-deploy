@@ -34,7 +34,7 @@ export function buildScraperUrl(portal: string, zona: string, propertyType: stri
     case 'Argenprop':
       return `https://www.argenprop.com/${typeSlug}/venta/${zonaSlug}?orden-masnuevos`
     case 'MercadoLibre':
-      return `https://inmuebles.mercadolibre.com.ar/${typeSlug}/venta/capital-federal/${zonaSlug}`
+      return `https://inmuebles.mercadolibre.com.ar/${typeSlug}/venta/capital-federal/${zonaSlug}_OrderId_BEGINS*DESC`
     default:
       throw new Error(`Unknown portal: ${portal}`)
   }
@@ -59,8 +59,9 @@ export function buildPaginatedUrl(baseUrl: string, portal: string, pageNumber: n
 
     case 'MercadoLibre':
       // MercadoLibre uses _Desde_X where X = (page-1)*48 + 1
+      // Insert _Desde before _OrderId to maintain sort order across pages
       const offset = (pageNumber - 1) * 48 + 1
-      return `${baseUrl}_Desde_${offset}`
+      return baseUrl.replace('_OrderId_', `_Desde_${offset}_OrderId_`)
 
     default:
       return baseUrl

@@ -94,7 +94,7 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, tot
   const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([sort]);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const isCustomSortActive = sort.key !== 'created_at' || sort.direction !== 'desc';
+  const isCustomSortActive = sortConfigs.length > 1 || sort.key !== 'created_at' || sort.direction !== 'desc';
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Clear selection when filters change (properties list changes)
@@ -102,21 +102,54 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, tot
     setSelectedIds(new Set());
   }, [properties]);
 
-  // Server-side sorting: clicking a column header sends the sort to the server
+  // Server-side sorting (primary) + client-side multi-sort (Shift+click secondary)
   const requestSort = (key: SortableKeys, event: React.MouseEvent) => {
-    const newDirection: 'asc' | 'desc' =
-      (sortConfigs.length === 1 && sortConfigs[0].key === key)
-        ? (sortConfigs[0].direction === 'asc' ? 'desc' : 'asc')
-        : 'desc';
-
-    const newSort = { key, direction: newDirection };
-    setSortConfigs([newSort]);
-    // Send sort to server via context — this triggers a new fetch with correct ordering across ALL properties
-    onSortChange(newSort);
+    if (event.shiftKey && sortConfigs.length > 0) {
+      // Shift+click: add or toggle secondary sort (client-side within current page)
+      const existing = sortConfigs.findIndex(c => c.key === key);
+      if (existing > 0) {
+        // Toggle direction of existing secondary sort
+        const newConfigs = [...sortConfigs];
+        newConfigs[existing] = { ...newConfigs[existing], direction: newConfigs[existing].direction === 'asc' ? 'desc' : 'asc' };
+        setSortConfigs(newConfigs);
+      } else if (existing === 0) {
+        // Clicking the primary sort with shift — toggle its direction
+        const newConfigs = [...sortConfigs];
+        newConfigs[0] = { ...newConfigs[0], direction: newConfigs[0].direction === 'asc' ? 'desc' : 'asc' };
+        setSortConfigs(newConfigs);
+        onSortChange(newConfigs[0]);
+      } else {
+        // Add new secondary sort
+        setSortConfigs([...sortConfigs, { key, direction: 'desc' }]);
+      }
+    } else {
+      // Normal click: primary sort (server-side across ALL properties)
+      const newDirection: 'asc' | 'desc' =
+        (sortConfigs.length === 1 && sortConfigs[0].key === key)
+          ? (sortConfigs[0].direction === 'asc' ? 'desc' : 'asc')
+          : 'desc';
+      const newSort = { key, direction: newDirection };
+      setSortConfigs([newSort]);
+      onSortChange(newSort);
+    }
   };
 
-  // Properties come pre-sorted from the server, no client-side sorting needed
-  const sortedProperties = properties;
+  // Primary sort comes from server. Secondary sorts (Shift+click) applied client-side.
+  const sortedProperties = useMemo(() => {
+    if (sortConfigs.length <= 1) return properties;
+    const secondarySorts = sortConfigs.slice(1);
+    return [...properties].sort((a, b) => {
+      for (const config of secondarySorts) {
+        const valA = (a as any)[config.key];
+        const valB = (b as any)[config.key];
+        if (valA == null) return 1;
+        if (valB == null) return -1;
+        if (valA < valB) return config.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return config.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }, [properties, sortConfigs]);
 
   const handleToggleSelection = useCallback((propertyId: string) => {
     setSelectedIds(prev => {

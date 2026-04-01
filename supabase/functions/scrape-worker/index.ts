@@ -15,7 +15,8 @@ import { parseListingPage, parsePropertyPage } from '../_shared/parsers/index.ts
 import { QueueTask, PORTAL_IDS } from '../_shared/types.ts'
 
 const MAX_RUNTIME_MS = 120_000  // 120s safety margin (Edge Function timeout is 150s)
-const DELAY_BETWEEN_TASKS_MS = 2_000  // Rate limit: 2s between ScraperAPI calls (ScraperAPI allows 20 concurrent)
+const BATCH_SIZE = 5            // Process 5 tasks in parallel (ScraperAPI allows 20 concurrent)
+const DELAY_BETWEEN_BATCHES_MS = 500  // Small pause between batches
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -39,38 +40,47 @@ Deno.serve(async (req) => {
 
   try {
     while (Date.now() - startTime < MAX_RUNTIME_MS) {
-      // Claim next task atomically
-      const { data: taskData, error: claimError } = await supabase
-        .rpc('claim_next_scraper_task')
+      // Claim a batch of tasks atomically (5 at once)
+      const { data: batchData, error: claimError } = await supabase
+        .rpc('claim_batch_scraper_tasks', { p_count: BATCH_SIZE })
 
       if (claimError) {
         errorDetails.push(`Claim error: ${claimError.message}`)
         break
       }
 
-      const task = taskData as unknown as QueueTask | { idle: true }
-      if (!task || 'idle' in task) break  // No more pending tasks
+      const tasks = batchData as unknown as QueueTask[]
+      if (!tasks || !Array.isArray(tasks) || tasks.length === 0) break  // No more pending tasks
 
-      try {
-        await processTask(supabase, task as QueueTask)
-        tasksProcessed++
-      } catch (e) {
-        errors++
-        const errMsg = e instanceof Error ? e.message : JSON.stringify(e)
-        errorDetails.push(`Task #${(task as QueueTask).id} (${(task as QueueTask).task_type} ${(task as QueueTask).portal}/${(task as QueueTask).zona}): ${errMsg}`)
-        try {
-          await handleTaskError(supabase, task as QueueTask, errMsg)
-        } catch (he) {
-          errorDetails.push(`HandleError failed for #${(task as QueueTask).id}: ${he instanceof Error ? he.message : String(he)}`)
+      // Process all tasks in the batch IN PARALLEL
+      const results = await Promise.allSettled(
+        tasks.map(task => processTask(supabase, task))
+      )
+
+      // Handle results individually
+      for (let i = 0; i < results.length; i++) {
+        if (results[i].status === 'fulfilled') {
+          tasksProcessed++
+        } else {
+          errors++
+          const reason = (results[i] as PromiseRejectedResult).reason
+          const errMsg = reason instanceof Error ? reason.message : JSON.stringify(reason)
+          const task = tasks[i]
+          errorDetails.push(`Task #${task.id} (${task.task_type} ${task.portal}/${task.zona}): ${errMsg}`)
+          try {
+            await handleTaskError(supabase, task, errMsg)
+          } catch (he) {
+            errorDetails.push(`HandleError failed for #${task.id}: ${he instanceof Error ? he.message : String(he)}`)
+          }
         }
       }
 
-      // Rate limit: wait between ScraperAPI calls
+      // Small delay between batches (not between individual tasks)
       const elapsed = Date.now() - startTime
-      if (elapsed + DELAY_BETWEEN_TASKS_MS + 20_000 < MAX_RUNTIME_MS) {
-        await delay(DELAY_BETWEEN_TASKS_MS)
+      if (elapsed + DELAY_BETWEEN_BATCHES_MS + 15_000 < MAX_RUNTIME_MS) {
+        await delay(DELAY_BETWEEN_BATCHES_MS)
       } else {
-        break  // Not enough time for another task
+        break  // Not enough time for another batch
       }
     }
 
@@ -79,7 +89,7 @@ Deno.serve(async (req) => {
         success: true,
         tasks_processed: tasksProcessed,
         errors,
-        error_details: errorDetails,
+        error_details: errorDetails.slice(0, 20),  // Limit to 20 errors in response
         runtime_ms: Date.now() - startTime,
       }),
       { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }

@@ -120,7 +120,7 @@ export function parseZonapropPropertyPage(html: string, zona: string): PropertyD
         } else if (label.includes('balc') || label.includes('balcón')) {
           prop.balcony_area = parseNumber(value)
         } else if (label.includes('amb') || label.includes('ambiente')) {
-          // ambientes - stored as bedrooms for now (DB uses bedrooms field)
+          if (!prop.bedrooms) prop.bedrooms = parseNumber(value)
         } else if (label.includes('dorm') || label.includes('dormitorio')) {
           prop.bedrooms = parseNumber(value)
         } else if (label.includes('baño')) {

@@ -45,7 +45,16 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({ proper
         <div className="flex-grow overflow-y-auto p-4 sm:p-6 bg-[var(--bg-primary)]">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <div className="lg:col-span-3">
-              <img src={property.imageUrl || `https://picsum.photos/seed/prop${property.id}/800/600`} alt={property.title} className="w-full h-64 sm:h-80 object-cover rounded-lg mb-6 border border-[var(--border-primary)]"/>
+              {property.imageUrl ? (
+                <img src={property.imageUrl} alt={property.title} className="w-full h-64 sm:h-80 object-cover rounded-lg mb-6 border border-[var(--border-primary)]"/>
+              ) : (
+                <div className="w-full h-64 sm:h-80 rounded-lg mb-6 border border-[var(--border-primary)] bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-tertiary)]">
+                  <div className="text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-3 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" /></svg>
+                    <span className="text-sm">Sin imagen disponible</span>
+                  </div>
+                </div>
+              )}
               <div>
                 <h3 className="font-semibold text-[var(--primary-accent-text)] mb-2">Descripción</h3>
                 <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap">{property.description || 'No hay descripción disponible.'}</p>
@@ -58,7 +67,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({ proper
                 <div className="space-y-3 text-[var(--text-primary)] text-sm">
                   <p><strong>Ubicación:</strong> {property.location}</p>
                   <p><strong>Precio:</strong> {property.currency} {property.price.toLocaleString('es-AR')}</p>
-                  <p><strong>Ambientes:</strong> {property.bedrooms ?? 'N/A'}</p>
+                  <p><strong>Ambientes:</strong> {property.ambientes ?? 'N/A'}</p>
+                  <p><strong>Dormitorios:</strong> {property.bedrooms ?? 'N/A'}</p>
                   <p><strong>Baños:</strong> {property.bathrooms ?? 'N/A'}</p>
                 </div>
               </div>

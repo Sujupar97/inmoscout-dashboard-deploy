@@ -100,6 +100,7 @@ export interface Database {
           zona: string | null;
           link: string;
           image_url: string | null;
+          ambientes: number | null;
           bedrooms: number | null;
           bathrooms: number | null;
           description: string | null;
@@ -109,7 +110,6 @@ export interface Database {
           dias_en_mercado: number | null;
           area: number | null;
           covered_area: number | null;
-          uncovered_area: number | null;
           balcony_area: number | null;
           visualizaciones: number | null;
           latitude: number | null;
@@ -127,6 +127,7 @@ export interface Database {
           zona?: string | null;
           link: string;
           image_url?: string | null;
+          ambientes?: number | null;
           bedrooms?: number | null;
           bathrooms?: number | null;
           description: string | null;
@@ -136,7 +137,6 @@ export interface Database {
           dias_en_mercado?: number | null;
           area?: number | null;
           covered_area?: number | null;
-          uncovered_area?: number | null;
           balcony_area?: number | null;
           visualizaciones?: number | null;
           latitude?: number | null;
@@ -154,6 +154,7 @@ export interface Database {
           zona?: string | null;
           link?: string;
           image_url?: string | null;
+          ambientes?: number | null;
           bedrooms?: number | null;
           bathrooms?: number | null;
           description?: string | null;
@@ -163,7 +164,6 @@ export interface Database {
           dias_en_mercado?: number | null;
           area?: number | null;
           covered_area?: number | null;
-          uncovered_area?: number | null;
           balcony_area?: number | null;
           visualizaciones?: number | null;
           latitude?: number | null;

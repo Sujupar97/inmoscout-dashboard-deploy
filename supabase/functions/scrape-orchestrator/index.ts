@@ -30,9 +30,10 @@ Deno.serve(async (req) => {
 
     const results: string[] = []
 
-    // --- MODE: Scheduled (pg_cron calls this) ---
+    // --- MODE: Scheduled (pg_cron calls this with cycle: morning/midday/evening) ---
     if (payload.mode === 'scheduled') {
-      return await handleScheduledMode(supabase, results)
+      const cycle = (payload.cycle as string) || 'morning'
+      return await handleScheduledMode(supabase, results, cycle)
     }
 
     // --- MODE: Manual (frontend calls this with specific job) ---

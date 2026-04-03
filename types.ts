@@ -18,6 +18,7 @@ export interface Property {
   zona: string | null;
   link: string;
   imageUrl: string | null;
+  ambientes: number | null;
   bedrooms: number | null;
   bathrooms: number | null;
   description: string | null;

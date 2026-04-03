@@ -18,11 +18,9 @@ import { PropertyData } from '../types.ts'
  * TERTIARY source: JSON-LD Product schema for title/price/image
  */
 
-/** Extract number from text like "38 m²" or "2". Returns null for ranges like "24 a 121 m²" */
+/** Extract number from text like "38 m²" or "2". For ranges like "24 a 121 m²", uses the first (minimum) value */
 function extractNumber(text: string): number | null {
   if (!text) return null
-  // Reject ranges: "24 a 121 m²"
-  if (/\d+\s+a\s+\d+/.test(text)) return null
   const match = text.match(/(\d+)/)
   return match ? parseInt(match[1], 10) : null
 }
@@ -32,7 +30,7 @@ export function parseMercadoLibrePropertyPage(html: string, zona: string): Prope
     titulo: null, precio: null, moneda: null, ubicacion: null,
     zona, link: '', image_url: null,
     area: null, covered_area: null, uncovered_area: null, balcony_area: null,
-    bedrooms: null, bathrooms: null, description: null,
+    ambientes: null, bedrooms: null, bathrooms: null, description: null,
     seller_name: null, nombre_anunciante: null, telefono_contacto: null,
     dias_en_mercado: null, visualizaciones: null,
     latitude: null, longitude: null, antiguedad: null,
@@ -80,8 +78,8 @@ export function parseMercadoLibrePropertyPage(html: string, zona: string): Prope
         const dormitorios = extractNumber(attrs.get('Dormitorios') || '')
         const banos = extractNumber(attrs.get('Baños') || attrs.get('Banos') || '')
 
+        if (ambientes && ambientes > 0 && ambientes < 20) prop.ambientes = ambientes
         if (dormitorios && dormitorios > 0 && dormitorios < 20) prop.bedrooms = dormitorios
-        else if (ambientes && ambientes > 0 && ambientes < 20) prop.bedrooms = ambientes
 
         if (banos && banos > 0 && banos < 20) prop.bathrooms = banos
 
@@ -114,7 +112,7 @@ export function parseMercadoLibrePropertyPage(html: string, zona: string): Prope
               const n = extractNumber(value); if (n) prop.balcony_area = n; break
             }
             case 'Ambientes': {
-              if (!prop.bedrooms) { const n = extractNumber(value); if (n && n < 20) prop.bedrooms = n }
+              if (!prop.ambientes) { const n = extractNumber(value); if (n && n < 20) prop.ambientes = n }
               break
             }
             case 'Dormitorios': {

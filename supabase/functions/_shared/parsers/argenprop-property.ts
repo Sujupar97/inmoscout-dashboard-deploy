@@ -33,7 +33,7 @@ export function parseArgenpropPropertyPage(html: string, zona: string): Property
     titulo: null, precio: null, moneda: null, ubicacion: null,
     zona, link: '', image_url: null,
     area: null, covered_area: null, uncovered_area: null, balcony_area: null,
-    bedrooms: null, bathrooms: null, description: null,
+    ambientes: null, bedrooms: null, bathrooms: null, description: null,
     seller_name: null, nombre_anunciante: null, telefono_contacto: null,
     dias_en_mercado: null, visualizaciones: null,
     latitude: null, longitude: null, antiguedad: null,

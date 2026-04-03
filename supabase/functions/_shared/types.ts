@@ -35,6 +35,7 @@ export interface PropertyData {
   covered_area: number | null
   uncovered_area: number | null
   balcony_area: number | null
+  ambientes: number | null
   bedrooms: number | null
   bathrooms: number | null
   description: string | null

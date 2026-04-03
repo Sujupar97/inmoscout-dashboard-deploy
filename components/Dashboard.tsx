@@ -364,14 +364,20 @@ export const Dashboard: React.FC<DashboardProps> = React.memo(({ properties, tot
                       </div>
                       <div className={`py-4 flex items-center overflow-hidden ${columnStyles.propiedad}`}>
                         <div className="flex-shrink-0 h-10 w-10">
-                          <img className="h-10 w-10 rounded-md object-cover" src={prop.imageUrl || `https://picsum.photos/seed/prop${prop.id}/200`} alt={prop.title} loading="lazy" decoding="async" />
+                          {prop.imageUrl ? (
+                          <img className="h-10 w-10 rounded-md object-cover" src={prop.imageUrl} alt={prop.title} loading="lazy" decoding="async" />
+                        ) : (
+                          <div className="h-10 w-10 rounded-md bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-tertiary)]">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" /></svg>
+                          </div>
+                        )}
                         </div>
                         <div className="ml-4 overflow-hidden">
                           <div className="text-sm font-medium text-[var(--text-primary)] truncate" title={prop.title}>{prop.title}</div>
                         </div>
                       </div>
                       <div className={`py-4 flex items-center whitespace-nowrap text-sm text-[var(--text-secondary)] ${columnStyles.tipo}`}>{prop.propertyType || 'N/A'}</div>
-                      <div className={`py-4 flex items-center justify-center whitespace-nowrap text-sm text-[var(--text-secondary)] ${columnStyles.ambientes}`}>{prop.bedrooms ?? '-'}</div>
+                      <div className={`py-4 flex items-center justify-center whitespace-nowrap text-sm text-[var(--text-secondary)] ${columnStyles.ambientes}`}>{prop.ambientes ?? prop.bedrooms ?? '-'}</div>
                       <div className={`py-4 flex items-center whitespace-nowrap text-sm text-[var(--text-secondary)] ${columnStyles.zona}`}>{prop.zona || 'N/A'}</div>
                       <div className={`py-4 flex items-center justify-end whitespace-nowrap text-sm text-[var(--text-primary)] ${columnStyles.precio}`}>{prop.currency} {prop.price.toLocaleString('es-AR')}</div>
                       <div className={`py-4 flex items-center justify-end whitespace-nowrap text-sm text-[var(--text-secondary)] ${columnStyles.m2pond}`}>{prop.total_calculated_sqm ? `${prop.total_calculated_sqm.toFixed(0)} m²` : '-'}</div>

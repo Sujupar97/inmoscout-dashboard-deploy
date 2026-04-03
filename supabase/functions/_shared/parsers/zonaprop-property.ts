@@ -35,12 +35,15 @@ function extractJsonSnippet(text: string, keyName: string): unknown | null {
   }
 }
 
-/** Parse a number from a string like "45 m²" */
+/** Parse a number from a string like "45 m²" or "45,5 m²" */
 function parseNumber(text: string | undefined | null): number | null {
   if (!text) return null
-  const str = String(text).replace(/\./g, '')
-  const nums = str.match(/\d+/)
-  return nums ? parseInt(nums[0], 10) : null
+  // Remove thousands separator (dot), convert decimal comma to dot
+  const str = String(text).replace(/\./g, '').replace(',', '.')
+  const nums = str.match(/\d+\.?\d*/)
+  if (!nums) return null
+  const num = parseFloat(nums[0])
+  return isNaN(num) ? null : num
 }
 
 /** Clean text: decode unicode escapes and strip HTML */
@@ -74,7 +77,7 @@ export function parseZonapropPropertyPage(html: string, zona: string): PropertyD
     titulo: null, precio: null, moneda: null, ubicacion: null,
     zona, link: '', image_url: null,
     area: null, covered_area: null, uncovered_area: null, balcony_area: null,
-    bedrooms: null, bathrooms: null, description: null,
+    ambientes: null, bedrooms: null, bathrooms: null, description: null,
     seller_name: null, nombre_anunciante: null, telefono_contacto: null,
     dias_en_mercado: null, visualizaciones: null,
     latitude: null, longitude: null, antiguedad: null,
@@ -120,7 +123,7 @@ export function parseZonapropPropertyPage(html: string, zona: string): PropertyD
         } else if (label.includes('balc') || label.includes('balcón')) {
           prop.balcony_area = parseNumber(value)
         } else if (label.includes('amb') || label.includes('ambiente')) {
-          if (!prop.bedrooms) prop.bedrooms = parseNumber(value)
+          prop.ambientes = parseNumber(value)
         } else if (label.includes('dorm') || label.includes('dormitorio')) {
           prop.bedrooms = parseNumber(value)
         } else if (label.includes('baño')) {

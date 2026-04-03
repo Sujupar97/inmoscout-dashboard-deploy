@@ -239,6 +239,7 @@ async function processPropertyPage(supabase: ReturnType<typeof getSupabaseClient
       covered_area: propertyData.covered_area,
       total_area: propertyData.area,  // total_area = area in this DB schema
       balcony_area: propertyData.balcony_area,
+      ambientes: propertyData.ambientes,
       bedrooms: propertyData.bedrooms,
       bathrooms: propertyData.bathrooms,
       description: propertyData.description || '',

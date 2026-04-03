@@ -316,6 +316,7 @@ const mapDbRowToProperty = (row: PropertyRow): Property => {
     zona: row.zona,
     link: row.link,
     imageUrl: row.image_url,
+    ambientes: row.ambientes,
     bedrooms: row.bedrooms,
     bathrooms: row.bathrooms,
     description: row.description,
@@ -325,7 +326,7 @@ const mapDbRowToProperty = (row: PropertyRow): Property => {
     days_on_market: dynamicDaysOnMarket,
     area: row.area,
     covered_area: row.covered_area,
-    uncovered_area: row.uncovered_area,
+    uncovered_area: null, // Calculated server-side by RPC, not a real DB column
     balcony_area: row.balcony_area,
     visualizaciones: row.visualizaciones,
     latitude: row.latitude,

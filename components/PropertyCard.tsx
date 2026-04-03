@@ -49,7 +49,16 @@ export const PropertyCard: React.FC<PropertyCardProps> = React.memo(({ property,
           }}
           aria-label={`Seleccionar ${property.title}`}
         />
-        <img className="h-48 w-full object-cover" src={property.imageUrl || `https://picsum.photos/seed/prop${property.id}/400/300`} alt={property.title} loading="lazy" decoding="async" />
+        {property.imageUrl ? (
+          <img className="h-48 w-full object-cover" src={property.imageUrl} alt={property.title} loading="lazy" decoding="async" />
+        ) : (
+          <div className="h-48 w-full flex items-center justify-center bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]">
+            <div className="text-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-2 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" /></svg>
+              <span className="text-xs">Sin imagen</span>
+            </div>
+          </div>
+        )}
         {isOpportunity && (
           <div className="absolute top-2 left-2 bg-green-500 text-black text-xs font-bold px-3 py-1 rounded-full flex items-center shadow-lg">
             <TagIcon className="h-4 w-4 mr-1" />
